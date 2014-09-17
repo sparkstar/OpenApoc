@@ -410,6 +410,11 @@ void Control::ConfigureFromXML( tinyxml2::XMLElement* Element )
 			CheckBox* cb = new CheckBox( this );
 			cb->ConfigureFromXML( node );
 		}
+		if( nodename == "xcombasegrid" )
+		{
+			XComBaseGrid* xbg = new XComBaseGrid( this );
+			xbg->ConfigureFromXML( node );
+		}
 		if( nodename == "vscroll" )
 		{
 			VScrollBar* vsb = new VScrollBar( this );

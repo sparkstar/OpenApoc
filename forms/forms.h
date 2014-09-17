@@ -13,3 +13,4 @@
 #include "hscrollbar.h"
 #include "list.h"
 #include "textedit.h"
+#include "xcombasegrid.h"
