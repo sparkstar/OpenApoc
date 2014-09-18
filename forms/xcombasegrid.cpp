@@ -7,7 +7,7 @@ const int HEIGHT = 32;
 const int ROW = 8;
 const int COL = 8;
 
-const std::string pck_string_front = "PCK:UFODATA/NEWBUT.PCK:UFODATA/NEWBUT.TAB:";
+const std::string pck_string_front = "PCK:UFODATA/BASE.PCK:UFODATA/BASE.TAB:";
 const std::string pck_string_back = ":TACDATA/TACTICAL.PAL";
 
 XComBaseGrid::XComBaseGrid(Control* Owner) : Control( Owner )
@@ -26,39 +26,70 @@ void XComBaseGrid::LoadResources()
 	if ( baseGridImage == nullptr )
 	{
 		baseGridImage = al_create_bitmap(WIDTH * COL, HEIGHT * ROW);
-		al_set_target_bitmap(baseGridImage);
-		al_clear_to_color(al_map_rgba(0, 0, 0, 0));
 	}
+
+	if ( baseFacilityImage == nullptr )
+	{
+		baseFacilityImage = GAMECORE->GetImage(pck_string_front + "6" + pck_string_back);
+	}
+
+	std::cout << "baseGridImage is : " << baseGridImage << std::endl;
+	std::cout << "baseFacilityImage is : " << baseFacilityImage << std::endl;
+
 }
 
 void XComBaseGrid::OnRender()
 {
-	if ( this->baseGridImage == nullptr )
+	if ( this->baseGridImage == nullptr || baseFacilityImage == nullptr )
 	{
 		return;
 	}
 
-	for (auto i = 0 ; i < COL ; i++) {
-		for (auto j = 0 ; j < ROW ; j++) {
-			auto idx = i * COL + j;
-			auto sx = 0;
-			auto sy = 0;
-			auto sw = WIDTH;
-			auto sh = HEIGHT;
-			auto dx = i * WIDTH;
-			auto dy = j * HEIGHT;
-			auto facility = this->facilities->at(idx);
-			auto facility_image = GAMECORE->GetImage(pck_string_front + std::to_string(facility) + pck_string_back);
-
-			al_draw_bitmap_region(facility_image, sx, sy, sw, sh, dx, dy, 0);
-		}
+	al_hold_bitmap_drawing(true);
+	for ( int i = 0 ; i < ROW * COL ; i++ )
+	{
+		al_draw_bitmap_region(baseFacilityImage,
+							  0,
+							  0,
+							  WIDTH,
+							  HEIGHT,
+							  GetGridX(i) * WIDTH,
+							  GetGridY(i) * HEIGHT,
+							  0);
 	}
+	al_hold_bitmap_drawing(false);
+}
 
+int XComBaseGrid::GetGridX(int num)
+{
+	return num / ROW;
+}
 
+int XComBaseGrid::GetGridY(int num)
+{
+	return num % ROW;
+}
+
+int XComBaseGrid::GetGridXFromMouseVector(int xPos)
+{
+	return xPos / WIDTH;
+}
+
+int XComBaseGrid::GetGridYFromMouseVector(int yPos)
+{
+	return yPos / HEIGHT;
 }
 
 void XComBaseGrid::EventOccured( Event* e )
 {
+	if( e->Data.Forms.EventFlag == FormEventType::MouseClick )
+	{
+		std::cerr << "click position on basegrid : " << "("
+				  << e->Data.Mouse.X << ", " << e->Data.Mouse.Y << "), ("
+				  << GetGridXFromMouseVector(e->Data.Mouse.X) << ", "
+				  << GetGridYFromMouseVector(e->Data.Mouse.Y) << ")" << std::endl;
+	}
+
 	Control::EventOccured( e );
 }
 
@@ -69,5 +100,16 @@ void XComBaseGrid::Update()
 
 void XComBaseGrid::UnloadResources()
 {
+	if( baseGridImage != nullptr )
+	{
+		al_destroy_bitmap( baseGridImage );
+		baseGridImage = nullptr;
+	}
+	if( baseFacilityImage != nullptr )
+	{
+		al_destroy_bitmap( baseFacilityImage );
+		baseFacilityImage = nullptr;
+	}
+	delete facilities;
 	Control::UnloadResources();
 }

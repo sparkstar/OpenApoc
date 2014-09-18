@@ -8,7 +8,13 @@ class XComBaseGrid: public Control
 	private:
 		std::vector<int >* facilities;
 		ALLEGRO_BITMAP* baseGridImage;
+		ALLEGRO_BITMAP* baseFacilityImage;
 
+		int GetGridX(int );
+		int GetGridY(int );
+
+		int GetGridXFromMouseVector(int );
+		int GetGridYFromMouseVector(int );
 
 	protected:
 		virtual void OnRender();

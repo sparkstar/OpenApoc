@@ -18,7 +18,7 @@
             
 
             <xcombasegrid id="GRID_XCOM_BASE">
-                <position x="30" y="30" />
+                <position x="200" y="80" />
                 <size width="256" height="256" />
             </xcombasegrid>
 
