@@ -261,7 +261,8 @@ TransactionControl::createControl(GameState &state, StateRef<AEquipmentType> age
 	bool isBio = agentEquipmentType->bioStorage;
 	int price = 0;
 	int storeSpace = agentEquipmentType->store_space;
-	bool researched = isBio ? true : agentEquipmentType->research_dependency.satisfied();
+
+	const bool researched = isBio || agentEquipmentType->isResearched();
 
 	std::vector<int> initialStock;
 	bool hasStock = false;
@@ -644,7 +645,8 @@ TransactionControl::createControl(const UString &id, Type type, const UString &n
 	// Price
 	if (price != 0 && (indexLeft == ECONOMY_IDX || indexRight == ECONOMY_IDX))
 	{
-		auto label = control->createChild<Label>(format("$%d", control->price), labelFont);
+		auto label = control->createChild<Label>(
+		    format("$%s", Strings::fromInteger(control->price, true)), labelFont);
 		label->Location = {290, 3};
 		label->Size = {47, 16};
 		label->TextHAlign = HorizontalAlignment::Right;

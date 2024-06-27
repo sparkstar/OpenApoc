@@ -28,7 +28,13 @@ void VehicleSheet::display(sp<VehicleType> vehicleType)
 void VehicleSheet::display(sp<VEquipment> item)
 {
 	clear();
-	displayEquipImplementation(item, item->type);
+	displayEquipImplementation(item, item->type, item->type->research_dependency.satisfied());
+}
+
+void VehicleSheet::display(sp<VEquipmentType> itemType)
+{
+	clear();
+	displayEquipImplementation(nullptr, itemType, itemType->research_dependency.satisfied());
 }
 
 void VehicleSheet::display(sp<VEquipmentType> itemType, bool researched)
@@ -132,13 +138,14 @@ void VehicleSheet::displayEquipImplementation(sp<VEquipment> item, sp<VEquipment
 	form->findControlTyped<Label>("LABEL_2_L")->setText(tr("Storage"));
 	form->findControlTyped<Label>("LABEL_2_R")->setText(format("%d", type->store_space));
 
+	form->findControlTyped<TextEdit>("TEXT_VEHICLE_NAME")->setText("");
+
 	if (!isResearched)
 	{
 		form->findControlTyped<Label>("ITEM_NAME")->setText(tr("Alien Artifact"));
 		return;
 	}
 
-	form->findControlTyped<TextEdit>("TEXT_VEHICLE_NAME")->setText("");
 	form->findControlTyped<Label>("ITEM_NAME")->setText(item ? item->type->name : type->name);
 
 	// Draw equipment stats
@@ -212,7 +219,7 @@ void VehicleSheet::displayGeneral(sp<VEquipment> item [[maybe_unused]], sp<VEqui
 	}
 	if (type->alien_space)
 	{
-		form->findControlTyped<Label>(format("LABEL_%d_L", statsCount))->setText(tr("Aliens Held"));
+		form->findControlTyped<Label>(format("LABEL_%d_L", statsCount))->setText(tr("Max Samples"));
 		form->findControlTyped<Label>(format("LABEL_%d_R", statsCount))
 		    ->setText(format("%d", type->alien_space));
 		statsCount++;

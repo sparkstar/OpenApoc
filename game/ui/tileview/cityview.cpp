@@ -3073,7 +3073,8 @@ void CityView::update()
 
 		if (!state->current_city->cityViewSelectedOtherVehicles.empty())
 		{
-			auto selectedVehicle = state->current_city->cityViewSelectedOtherVehicles.front();
+			const auto &selectedVehicle =
+			    state->current_city->cityViewSelectedOtherVehicles.front();
 			if (selectedVehicle->owner == state->getPlayer())
 			{
 				uiTabs[6]->findControlTyped<Label>("TEXT_VEHICLE_NAME")->setText("");
@@ -3081,9 +3082,16 @@ void CityView::update()
 			}
 			else
 			{
+				const auto selectedVehicleIsUnresearchedUfo =
+				    selectedVehicle->owner == state->getAliens() &&
+				    !selectedVehicle->type->ufopaedia_entry->dependency.satisfied();
+
+				const auto vehicleDisplayName =
+				    selectedVehicleIsUnresearchedUfo ? tr("UFO") : selectedVehicle->name;
+
 				uiTabs[6]
 				    ->findControlTyped<Label>("TEXT_VEHICLE_NAME")
-				    ->setText(selectedVehicle->name);
+				    ->setText(vehicleDisplayName);
 				uiTabs[6]
 				    ->findControlTyped<Label>("TEXT_VEHICLE_OWNER")
 				    ->setText(selectedVehicle->owner->name);
@@ -3097,13 +3105,13 @@ void CityView::update()
 
 		int currentVehicleIndex = -1;
 		std::set<sp<Vehicle>> vehiclesMIA;
-		for (auto &i : hostileVehicleInfoList)
+		for (const auto &i : hostileVehicleInfoList)
 		{
 			vehiclesMIA.insert(i.vehicle);
 		}
-		for (auto &v : state->vehicles)
+		for (const auto &v : state->vehicles)
 		{
-			auto vehicle = v.second;
+			const auto &vehicle = v.second;
 			if (!v.second->tileObject || v.second->city != state->current_city ||
 			    v.second->isDead())
 			{
@@ -3111,73 +3119,74 @@ void CityView::update()
 			}
 
 			// Show selected non-player vehicle in list of hostile vehicles
-			if (state->getPlayer()->isRelatedTo(vehicle->owner) != Organisation::Relation::Hostile)
+			if (state->getPlayer()->isRelatedTo(vehicle->owner) !=
+			        Organisation::Relation::Hostile &&
+			    (vehicle->owner == state->getPlayer() ||
+			     state->current_city->cityViewSelectedOtherVehicles.empty() ||
+			     state->current_city->cityViewSelectedOtherVehicles.front() != v.second))
 			{
-				if (vehicle->owner == state->getPlayer() ||
-				    state->current_city->cityViewSelectedOtherVehicles.empty() ||
-				    state->current_city->cityViewSelectedOtherVehicles.front() != v.second)
-				{
-					continue;
-				}
+				continue;
 			}
 
 			currentVehicleIndex++;
-			auto info = ControlGenerator::createVehicleInfo(*state, vehicle);
+			const auto info = ControlGenerator::createVehicleInfo(*state, vehicle);
 			vehiclesMIA.erase(info.vehicle);
-			bool redo = currentVehicleIndex >= hostileVehicleInfoList.size() ||
-			            hostileVehicleInfoList[currentVehicleIndex] != info;
-			if (redo)
+			const auto redo = currentVehicleIndex >= hostileVehicleInfoList.size() ||
+			                  hostileVehicleInfoList[currentVehicleIndex] != info;
+
+			if (!redo)
+				continue;
+
+			auto control = ControlGenerator::createVehicleControl(*state, info);
+			control->addCallback(
+			    FormEventType::MouseDown,
+			    [this, vehicle](FormsEvent *e)
+			    {
+				    // if (!this->vanillaControls)
+				    //{
+				    //	if (Event::isPressed(e->forms().MouseInfo.Button,
+				    //		Event::MouseButton::Right))
+				    //	{
+				    //		// [Alt/Ctrl] + [Shift] opens equipment
+				    //		if ((modifierLShift || modifierRShift) &&
+				    //			(modifierLAlt || modifierRAlt || modifierLCtrl ||
+				    //				modifierRCtrl))
+				    //		{
+				    //			// Equipscreen for owner vehicles
+				    //			auto equipScreen = mksp<VEquipScreen>(this->state);
+				    //			equipScreen->setSelectedVehicle(vehicle);
+				    //			fw().stageQueueCommand({ StageCmd::Command::PUSH, equipScreen
+				    //}); 			return;
+				    //		}
+				    //		// [Shift] opens location
+				    //		if (modifierLShift || modifierRShift)
+				    //		{
+				    //			// Location screen
+				    //			fw().stageQueueCommand(
+				    //			{ StageCmd::Command::PUSH,
+				    //				mksp<LocationScreen>(this->state, vehicle) });
+				    //			return;
+				    //		}
+				    //	}
+				    //}
+				    handleClickedVehicle(
+				        StateRef<Vehicle>{state.get(), Vehicle::getId(*state, vehicle)},
+				        Event::isPressed(e->forms().MouseInfo.Button, Event::MouseButton::Right),
+				        CitySelectionState::Normal);
+			    });
+
+			if (currentVehicleIndex >= hostileVehicleInfoList.size())
 			{
-				auto control = ControlGenerator::createVehicleControl(*state, info);
-				control->addCallback(
-				    FormEventType::MouseDown,
-				    [this, vehicle](FormsEvent *e)
-				    {
-					    // if (!this->vanillaControls)
-					    //{
-					    //	if (Event::isPressed(e->forms().MouseInfo.Button,
-					    //		Event::MouseButton::Right))
-					    //	{
-					    //		// [Alt/Ctrl] + [Shift] opens equipment
-					    //		if ((modifierLShift || modifierRShift) &&
-					    //			(modifierLAlt || modifierRAlt || modifierLCtrl ||
-					    //				modifierRCtrl))
-					    //		{
-					    //			// Equipscreen for owner vehicles
-					    //			auto equipScreen = mksp<VEquipScreen>(this->state);
-					    //			equipScreen->setSelectedVehicle(vehicle);
-					    //			fw().stageQueueCommand({ StageCmd::Command::PUSH, equipScreen
-					    //}); 			return;
-					    //		}
-					    //		// [Shift] opens location
-					    //		if (modifierLShift || modifierRShift)
-					    //		{
-					    //			// Location screen
-					    //			fw().stageQueueCommand(
-					    //			{ StageCmd::Command::PUSH,
-					    //				mksp<LocationScreen>(this->state, vehicle) });
-					    //			return;
-					    //		}
-					    //	}
-					    //}
-					    handleClickedVehicle(
-					        StateRef<Vehicle>{state.get(), Vehicle::getId(*state, vehicle)},
-					        Event::isPressed(e->forms().MouseInfo.Button,
-					                         Event::MouseButton::Right),
-					        CitySelectionState::Normal);
-				    });
-				if (currentVehicleIndex >= hostileVehicleInfoList.size())
-				{
-					hostileVehicleInfoList.push_back(info);
-				}
-				else
-				{
-					hostileVehicleInfoList[currentVehicleIndex] = info;
-				}
-				hostileVehicleList->replaceItem(control);
+				hostileVehicleInfoList.push_back(info);
 			}
+			else
+			{
+				hostileVehicleInfoList[currentVehicleIndex] = info;
+			}
+
+			hostileVehicleList->replaceItem(control);
 		}
-		for (auto &v : vehiclesMIA)
+		for (const auto &v : vehiclesMIA)
 		{
 			hostileVehicleList->removeByData<Vehicle>(v);
 		}
@@ -3242,7 +3251,7 @@ void CityView::update()
 			        ? (Organisation::Relation)0
 			        : (Organisation::Relation)(state->current_city->cityViewOrgButtonIndex - 1);
 			if (state->current_city->cityViewOrgButtonIndex != 0 &&
-			    state->getPlayer()->isRelatedTo({state.get(), o.first}) != rel)
+			    o.second->isRelatedTo(state->getPlayer()) != rel)
 			{
 				continue;
 			}
@@ -3773,73 +3782,69 @@ bool CityView::handleMouseDown(Event *e)
 					scenery =
 					    std::dynamic_pointer_cast<TileObjectScenery>(collision.obj)->getOwner();
 					building = scenery->building;
-					if (true)
-					{
-						Vec3<int> t = scenery->currentPosition;
-						UString debug = "";
-						debug +=
-						    format("\nCLICKED %s SCENERY %s at %s BUILDING %s",
-						           scenery->falling || scenery->willCollapse() ? "FALLING" : "OK",
-						           scenery->type.id, t, building.id);
-						// debug += format("\n LOS BLOCK %d", battle.getLosBlockID(t.x, t.y, t.z));
 
-						debug += format(
-						    "\nHt [%d] Con [%d] Type [%d|%d|%d] Road [%d%d%d%d] Hill [%d%d%d%d] "
-						    "Tube "
-						    "[%d%d%d%d%d%d]",
-						    scenery->type->height, scenery->type->constitution,
-						    (int)scenery->type->tile_type, (int)scenery->type->road_type,
-						    (int)scenery->type->walk_mode, (int)scenery->type->connection[0],
-						    (int)scenery->type->connection[1], (int)scenery->type->connection[2],
-						    (int)scenery->type->connection[3], (int)scenery->type->hill[0],
-						    (int)scenery->type->hill[1], (int)scenery->type->hill[2],
-						    (int)scenery->type->hill[3], (int)scenery->type->tube[0],
-						    (int)scenery->type->tube[1], (int)scenery->type->tube[2],
-						    (int)scenery->type->tube[3], (int)scenery->type->tube[4],
-						    (int)scenery->type->tube[5]);
-						auto &map = *state->current_city->map;
-						for (auto &p : scenery->supportedBy)
+					Vec3<int> t = scenery->currentPosition;
+					UString debug = "";
+					debug += format("\nCLICKED %s SCENERY %s at %s BUILDING %s",
+					                scenery->falling || scenery->willCollapse() ? "FALLING" : "OK",
+					                scenery->type.id, t, building.id);
+					// debug += format("\n LOS BLOCK %d", battle.getLosBlockID(t.x, t.y, t.z));
+
+					debug +=
+					    format("\nHt [%d] Con [%d] Type [%d|%d|%d] Road [%d%d%d%d] Hill [%d%d%d%d] "
+					           "Tube "
+					           "[%d%d%d%d%d%d]",
+					           scenery->type->height, scenery->type->constitution,
+					           (int)scenery->type->tile_type, (int)scenery->type->road_type,
+					           (int)scenery->type->walk_mode, (int)scenery->type->connection[0],
+					           (int)scenery->type->connection[1], (int)scenery->type->connection[2],
+					           (int)scenery->type->connection[3], (int)scenery->type->hill[0],
+					           (int)scenery->type->hill[1], (int)scenery->type->hill[2],
+					           (int)scenery->type->hill[3], (int)scenery->type->tube[0],
+					           (int)scenery->type->tube[1], (int)scenery->type->tube[2],
+					           (int)scenery->type->tube[3], (int)scenery->type->tube[4],
+					           (int)scenery->type->tube[5]);
+					auto &map = *state->current_city->map;
+					for (auto &p : scenery->supportedBy)
+					{
+						debug += format("\nCan be supported by %s", p);
+					}
+					for (auto &p : scenery->supportedParts)
+					{
+						debug += format("\nSupports %s", p);
+					}
+					for (int x = t.x - 1; x <= t.x + 1; x++)
+					{
+						for (int y = t.y - 1; y <= t.y + 1; y++)
 						{
-							debug += format("\nCan be supported by %s", p);
-						}
-						for (auto &p : scenery->supportedParts)
-						{
-							debug += format("\nSupports %s", p);
-						}
-						for (int x = t.x - 1; x <= t.x + 1; x++)
-						{
-							for (int y = t.y - 1; y <= t.y + 1; y++)
+							for (int z = t.z - 1; z <= t.z + 1; z++)
 							{
-								for (int z = t.z - 1; z <= t.z + 1; z++)
+								if (x < 0 || x >= map.size.x || y < 0 || y >= map.size.y || z < 0 ||
+								    z >= map.size.z)
 								{
-									if (x < 0 || x >= map.size.x || y < 0 || y >= map.size.y ||
-									    z < 0 || z >= map.size.z)
+									continue;
+								}
+								auto tile2 = map.getTile(x, y, z);
+								for (auto &o2 : tile2->ownedObjects)
+								{
+									if (o2->getType() == TileObject::Type::Scenery)
 									{
-										continue;
-									}
-									auto tile2 = map.getTile(x, y, z);
-									for (auto &o2 : tile2->ownedObjects)
-									{
-										if (o2->getType() == TileObject::Type::Scenery)
+										auto mp2 = std::static_pointer_cast<TileObjectScenery>(o2)
+										               ->getOwner();
+										for (auto &p : mp2->supportedParts)
 										{
-											auto mp2 =
-											    std::static_pointer_cast<TileObjectScenery>(o2)
-											        ->getOwner();
-											for (auto &p : mp2->supportedParts)
+											if (p == t)
 											{
-												if (p == t)
-												{
-													debug += format(
-													    "\nActually supported by %s at %d %d %d",
-													    mp2->type.id, x - t.x, y - t.y, z - t.z);
-												}
+												debug +=
+												    format("\nActually supported by %s at %d %d %d",
+												           mp2->type.id, x - t.x, y - t.y, z - t.z);
 											}
 										}
 									}
 								}
 							}
-							LogWarning("%s", debug);
 						}
+						LogWarning("%s", debug);
 					}
 
 					if (modifierLAlt && modifierLCtrl && modifierLShift)

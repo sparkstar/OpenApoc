@@ -273,9 +273,11 @@ void UfopaediaCategoryView::setFormStats()
 					if (data_id != "ORG_ALIEN")
 					{
 						orgLabels[1]->setText(tr("Balance"));
-						orgValues[1]->setText(format("$%d", ref->balance));
+						orgValues[1]->setText(
+						    format("$%s", Strings::fromInteger(ref->balance, true)));
 						orgLabels[2]->setText(tr("Income"));
-						orgValues[2]->setText(format("$%d", ref->income));
+						orgValues[2]->setText(
+						    format("$%s", Strings::fromInteger(ref->income, true)));
 
 						if (ref != player)
 						{
@@ -363,6 +365,8 @@ void UfopaediaCategoryView::setFormStats()
 					statsLabels[row]->setText(tr("Size"));
 					statsValues[row++]->setText(
 					    format("%dx%d", ref->equipscreen_size.x, ref->equipscreen_size.y));
+					statsLabels[row]->setText(tr("Storage"));
+					statsValues[row++]->setText(Strings::fromInteger(ref->store_space));
 					switch (ref->type)
 					{
 						case EquipmentSlotType::VehicleEngine:
@@ -413,7 +417,7 @@ void UfopaediaCategoryView::setFormStats()
 							}
 							if (ref->alien_space > 0)
 							{
-								statsLabels[row]->setText(tr("Aliens Held"));
+								statsLabels[row]->setText(tr("Max Samples"));
 								statsValues[row++]->setText(Strings::fromInteger(ref->alien_space));
 							}
 							if (ref->missile_jamming > 0)
@@ -449,6 +453,8 @@ void UfopaediaCategoryView::setFormStats()
 					statsLabels[row]->setText(tr("Size"));
 					statsValues[row++]->setText(
 					    format("%dx%d", ref->equipscreen_size.x, ref->equipscreen_size.y));
+					statsLabels[row]->setText(tr("Storage"));
+					statsValues[row++]->setText(Strings::fromInteger(ref->store_space));
 					if (ref->type == AEquipmentType::Type::Ammo ||
 					    (ref->type == AEquipmentType::Type::Weapon && ref->ammo_types.empty()))
 					{
@@ -504,11 +510,13 @@ void UfopaediaCategoryView::setFormStats()
 				{
 					StateRef<FacilityType> ref = {state.get(), data_id};
 					statsLabels[row]->setText(tr("Construction cost"));
-					statsValues[row++]->setText(format("$%d", ref->buildCost));
+					statsValues[row++]->setText(
+					    format("$%s", Strings::fromInteger(ref->buildCost, true)));
 					statsLabels[row]->setText(tr("Days to build"));
 					statsValues[row++]->setText(Strings::fromInteger(ref->buildTime));
 					statsLabels[row]->setText(tr("Weekly cost"));
-					statsValues[row++]->setText(format("$%d", ref->weeklyCost));
+					statsValues[row++]->setText(
+					    format("$%s", Strings::fromInteger(ref->weeklyCost, true)));
 					if (ref->capacityAmount > 0)
 					{
 						statsLabels[row]->setText(tr("Capacity"));

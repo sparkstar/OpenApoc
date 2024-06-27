@@ -130,7 +130,15 @@ void BaseScreen::begin()
 	        FormEventType::ButtonClick,
 	        [this](Event *)
 	        {
-		        if (this->state->current_base->containmentEmpty(*state))
+		        if (this->state->current_base->alienContainmentExists(*state))
+		        {
+			        fw().stageQueueCommand(
+			            {StageCmd::Command::PUSH,
+			             mksp<MessageBox>(tr("Alien Containment"),
+			                              tr("Alien Containment does not exist at this base."),
+			                              MessageBox::ButtonOptions::Ok)});
+		        }
+		        else if (this->state->current_base->alienContainmentIsEmpty(*state))
 		        {
 			        fw().stageQueueCommand(
 			            {StageCmd::Command::PUSH,
@@ -456,11 +464,12 @@ void BaseScreen::eventOccurred(Event *e)
 		selText->setText(tr(dragFacility->name));
 		selGraphic->setImage(dragFacility->sprite);
 		statsLabels[0]->setText(tr("Cost to build"));
-		statsValues[0]->setText(format("$%d", dragFacility->buildCost));
+		statsValues[0]->setText(format("$%s", Strings::fromInteger(dragFacility->buildCost, true)));
 		statsLabels[1]->setText(tr("Days to build"));
 		statsValues[1]->setText(format("%d", dragFacility->buildTime));
 		statsLabels[2]->setText(tr("Maintenance cost"));
-		statsValues[2]->setText(format("$%d", dragFacility->weeklyCost));
+		statsValues[2]->setText(
+		    format("$%s", Strings::fromInteger(dragFacility->weeklyCost, true)));
 	}
 	else if (selFacility != nullptr)
 	{
