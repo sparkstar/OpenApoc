@@ -1,23 +1,20 @@
 #include "game/state/shared/agent.h"
 #include "framework/configfile.h"
 #include "framework/framework.h"
-#include "game/state/battle/ai/aitype.h"
 #include "game/state/battle/battleunit.h"
 #include "game/state/city/agentmission.h"
 #include "game/state/city/base.h"
 #include "game/state/city/building.h"
 #include "game/state/city/city.h"
 #include "game/state/city/facility.h"
-#include "game/state/city/scenery.h"
 #include "game/state/city/vehicle.h"
 #include "game/state/gameevent.h"
 #include "game/state/gamestate.h"
 #include "game/state/rules/aequipmenttype.h"
-#include "game/state/rules/city/scenerytiletype.h"
 #include "game/state/shared/aequipment.h"
 #include "game/state/shared/organisation.h"
-#include "game/state/tilemap/tileobject_scenery.h"
 #include "library/strings_format.h"
+#include <algorithm>
 #include <glm/glm.hpp>
 
 namespace OpenApoc
@@ -31,7 +28,7 @@ template <> sp<Agent> StateObject<Agent>::get(const GameState &state, const UStr
 	auto it = state.agents.find(id);
 	if (it == state.agents.end())
 	{
-		LogError("No agent matching ID \"%s\"", id);
+		LogError("No agent matching ID \"{0}\"", id);
 		return nullptr;
 	}
 	return it->second;
@@ -55,7 +52,7 @@ template <> const UString &StateObject<Agent>::getId(const GameState &state, con
 		if (a.second == ptr)
 			return a.first;
 	}
-	LogError("No agent matching pointer %p", static_cast<void *>(ptr.get()));
+	LogError("No agent matching pointer {0:p}", static_cast<void *>(ptr.get()));
 	return emptyString;
 }
 
@@ -106,7 +103,7 @@ StateRef<Agent> AgentGenerator::createAgent(GameState &state, StateRef<Organisat
 
 		auto firstName = pickRandom(state.rng, firstNameList->second);
 		auto secondName = pickRandom(state.rng, this->second_names);
-		agent->name = format("%s %s", firstName, secondName);
+		agent->name = format("{0} {1}", firstName, secondName);
 	}
 	else
 	{
@@ -163,14 +160,16 @@ StateRef<Agent> AgentGenerator::createAgent(GameState &state, StateRef<Organisat
 		// Aliens get equipment based on player score
 		else if (org == state.getAliens())
 		{
-			initialEquipment = EquipmentSet::getByScore(state, state.totalScore.tacticalMissions)
+			initialEquipment = EquipmentSet::getForType(state, EquipmentSet::Type::Alien,
+			                                            state.totalScore.tacticalMissions)
 			                       ->generateEquipmentList(state);
 		}
 		// Every human org but civilians and player gets equipment based on tech level
 		else if (org != state.getCivilian())
 		{
 			initialEquipment =
-			    EquipmentSet::getByLevel(state, org->tech_level)->generateEquipmentList(state);
+			    EquipmentSet::getForType(state, EquipmentSet::Type::Human, org->tech_level)
+			        ->generateEquipmentList(state);
 		}
 	}
 	else
@@ -188,6 +187,7 @@ StateRef<Agent> AgentGenerator::createAgent(GameState &state, StateRef<Organisat
 	}
 
 	agent->updateSpeed();
+	agent->updatePsiDefence();
 	agent->modified_stats.restoreTU();
 
 	return {&state, ID};
@@ -293,7 +293,7 @@ UString Agent::getRankName() const
 		case Rank::Commander:
 			return tr("Commander");
 	}
-	LogError("Unknown rank %d", (int)rank);
+	LogError("Unknown rank {0}", (int)rank);
 	return "";
 }
 
@@ -411,7 +411,12 @@ void Agent::transfer(GameState &state, StateRef<Building> newHome)
 	homeBuilding = newHome;
 	recentlyHired = false;
 	recentlyTransferred = true;
-	assigned_to_lab = false;
+	if (lab_assigned)
+	{
+		auto thisRef = StateRef<Agent>{&state, shared_from_this()};
+		lab_assigned->assigned_agents.remove(thisRef);
+		lab_assigned = nullptr;
+	}
 	setMission(state, AgentMission::gotoBuilding(state, *this, newHome, false, true));
 }
 
@@ -506,10 +511,8 @@ bool Agent::canAddEquipment(Vec2<int> pos, StateRef<AEquipmentType> equipmentTyp
 		        }
 		        if (!validSlot)
 		        {
-		            LogInfo("Equipping \"%s\" on \"%s\" at {%d,%d} failed: Armor intersecting both
-		armor and non-armor slot",
-		                type->name, this->name, pos.x, pos.y);
-		            return false;
+		            LogInfo("Equipping \"{0}\" on \"{1}\" at {{{2},{3}}} failed: Armor intersecting
+		both armor and non-armor slot", type->name, this->name, pos.x, pos.y); return false;
 		        }
 		    }
 		}
@@ -664,7 +667,7 @@ sp<AEquipment> Agent::addEquipmentByType(GameState &state, StateRef<AEquipmentTy
 	{
 		if (!allowFailure)
 		{
-			LogError("Trying to add \"%s\" on agent \"%s\" failed: no valid slot found",
+			LogError("Trying to add \"{0}\" on agent \"{1}\" failed: no valid slot found",
 			         equipmentType.id, this->name);
 		}
 		return nullptr;
@@ -689,7 +692,7 @@ sp<AEquipment> Agent::addEquipmentByType(GameState &state, StateRef<AEquipmentTy
 	{
 		if (!allowFailure)
 		{
-			LogError("Trying to add \"%s\" on agent \"%s\" failed: no valid slot found",
+			LogError("Trying to add \"{0}\" on agent \"{1}\" failed: no valid slot found",
 			         equipmentType.id, this->name);
 		}
 		return nullptr;
@@ -737,7 +740,7 @@ void Agent::addEquipment(GameState &state, sp<AEquipment> object, EquipmentSlotT
 	Vec2<int> pos = findFirstSlotByType(slotType, object->type);
 	if (pos.x == -1)
 	{
-		LogError("Trying to add \"%s\" on agent \"%s\" failed: no valid slot found", type.id,
+		LogError("Trying to add \"{0}\" on agent \"{1}\" failed: no valid slot found", type.id,
 		         this->name);
 		return;
 	}
@@ -750,11 +753,11 @@ void Agent::addEquipment(GameState &state, Vec2<int> pos, sp<AEquipment> object)
 	EquipmentSlotType slotType;
 	if (!canAddEquipment(pos, object->type, slotType))
 	{
-		LogError("Trying to add \"%s\" at %s on agent  \"%s\" failed", object->type.id, pos,
+		LogError("Trying to add \"{0}\" at {1} on agent  \"{2}\" failed", object->type.id, pos,
 		         this->name);
 	}
 
-	LogInfo("Equipped \"%s\" with equipment \"%s\"", this->name, object->type->name);
+	LogInfo("Equipped \"{0}\" with equipment \"{1}\"", this->name, object->type->name);
 	// Proper position
 	for (auto &slot : type->equipment_layout->slots)
 	{
@@ -778,6 +781,7 @@ void Agent::addEquipment(GameState &state, Vec2<int> pos, sp<AEquipment> object)
 	}
 	this->equipment.emplace_back(object);
 	updateSpeed();
+	updatePsiDefence();
 	updateIsBrainsucker();
 	if (unit)
 	{
@@ -800,7 +804,7 @@ void Agent::removeEquipment(GameState &state, sp<AEquipment> object)
 	{
 		// Stop flying if jetpack lost
 		if (object->type->provides_flight && unit->target_body_state == BodyState::Flying &&
-		    !isBodyStateAllowed(BodyState::Flying))
+		    !isBodyStateAllowed(BodyState::Flying) && !unit->isDead())
 		{
 			unit->setBodyState(state, BodyState::Standing);
 		}
@@ -808,6 +812,7 @@ void Agent::removeEquipment(GameState &state, sp<AEquipment> object)
 	}
 	object->ownerAgent.clear();
 	updateSpeed();
+	updatePsiDefence();
 	updateIsBrainsucker();
 }
 
@@ -837,6 +842,21 @@ void Agent::updateModifiedStats()
 	modified_stats = current_stats;
 	modified_stats.health = health;
 	updateSpeed();
+	updatePsiDefence();
+}
+
+void Agent::updatePsiDefence()
+{
+	int mindShieldsInUse = 0;
+	for (auto &item : equipment)
+	{
+		if (item->type->type == AEquipmentType::Type::MindShield && item->inUse)
+		{
+			mindShieldsInUse++;
+		}
+	}
+	modified_stats.psi_defence =
+	    current_stats.psi_defence + MIND_SHIELD_PSI_DEFENCE_BONUS * mindShieldsInUse;
 }
 
 void Agent::updateIsBrainsucker()
@@ -906,12 +926,12 @@ bool Agent::popFinishedMissions(GameState &state)
 				break;
 			}
 		}
-		LogWarning("Agent %s mission \"%s\" finished", name, missions.front().getName());
+		LogWarning("Agent {0} mission \"{1}\" finished", name, missions.front().getName());
 		missions.pop_front();
 		popped = true;
 		if (!missions.empty())
 		{
-			LogWarning("Agent %s mission \"%s\" starting", name, missions.front().getName());
+			LogWarning("Agent {0} mission \"{1}\" starting", name, missions.front().getName());
 			missions.front().start(state, *this);
 			continue;
 		}
@@ -954,31 +974,25 @@ void Agent::die(GameState &state, bool silent)
 	if (currentVehicle)
 	{
 		currentVehicle->currentAgents.erase(thisRef);
+		currentVehicle = nullptr;
 	}
 	// Remove from building
 	if (currentBuilding)
 	{
 		currentBuilding->currentAgents.erase(thisRef);
+		currentBuilding = nullptr;
+	}
+	// Remove home
+	if (currentBuilding)
+	{
+		homeBuilding = nullptr;
 	}
 
 	// Remove from lab
-	if (assigned_to_lab)
+	if (lab_assigned)
 	{
-		for (auto &fac : homeBuilding->base->facilities)
-		{
-			if (!fac->lab)
-			{
-				continue;
-			}
-			auto it = std::find(fac->lab->assigned_agents.begin(), fac->lab->assigned_agents.end(),
-			                    thisRef);
-			if (it != fac->lab->assigned_agents.end())
-			{
-				fac->lab->assigned_agents.erase(it);
-				assigned_to_lab = false;
-				break;
-			}
-		}
+		lab_assigned->assigned_agents.remove(thisRef);
+		lab_assigned = nullptr;
 	}
 
 	// In city (if not died in a vehicle) we make an event
@@ -1463,11 +1477,12 @@ void Agent::destroy()
 {
 	leftHandItem = nullptr;
 	rightHandItem = nullptr;
-	while (!equipment.empty())
+	// Clear ownerAgent back-references without needing a valid GameState
+	for (auto &item : equipment)
 	{
-		GameState state;
-		this->removeEquipment(state, equipment.front());
+		item->ownerAgent.clear();
 	}
+	equipment.clear();
 }
 
 unsigned int Agent::getDaysInService(const GameState &state) const
@@ -1479,10 +1494,38 @@ unsigned int Agent::getKills() const { return killCount; }
 
 unsigned int Agent::getMissions() const { return missionCount; }
 
-unsigned int Agent::getMedalTier() const { return 0; }
+unsigned int Agent::getVictoryPoints(const GameState &state) const
+{
+	return std::max(victoryPoints, missionCount * 10 + killCount) + getDaysInService(state);
+}
 
-void Agent::incrementMissionCount() { missionCount++; }
+unsigned int Agent::getMedalTier(const GameState &state) const
+{
+	static const unsigned int thresholds[] = {200, 400, 700, 1000, 1500};
+	const auto points = getVictoryPoints(state);
+	unsigned int tier = 0;
+	for (const auto &threshold : thresholds)
+	{
+		if (points >= threshold)
+		{
+			tier++;
+		}
+	}
+	return tier;
+}
 
-void Agent::incrementKillCount() { killCount++; }
+void Agent::incrementMissionCount()
+{
+	missionCount++;
+	victoryPoints += 10;
+}
+
+void Agent::incrementKillCount()
+{
+	killCount++;
+	victoryPoints++;
+}
+
+void Agent::recordHealthLost(int amount) { victoryPoints += std::max(0, amount); }
 
 } // namespace OpenApoc

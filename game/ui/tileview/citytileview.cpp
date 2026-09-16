@@ -22,6 +22,7 @@
 #include "game/state/shared/organisation.h"
 #include "game/state/tilemap/tileobject_scenery.h"
 #include "game/state/tilemap/tileobject_vehicle.h"
+#include <algorithm>
 
 namespace OpenApoc
 {
@@ -81,24 +82,25 @@ CityTileView::CityTileView(TileMap &map, Vec3<int> isoTileSize, Vec2<int> stratT
 	for (int i = 72; i < 76; i++)
 	{
 		selectionBrackets[0].push_back(fw().data->loadImage(format(
-		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:%d:xcom3/ufodata/pal_01.dat",
+		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:{0}:xcom3/ufodata/pal_01.dat",
 		    i)));
 	}
 	for (int i = 76; i < 80; i++)
 	{
 		selectionBrackets[2].push_back(fw().data->loadImage(format(
-		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:%d:xcom3/ufodata/pal_01.dat",
+		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:{0}:xcom3/ufodata/pal_01.dat",
 		    i)));
 	}
 	for (int i = 80; i < 84; i++)
 	{
 		selectionBrackets[1].push_back(fw().data->loadImage(format(
-		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:%d:xcom3/ufodata/pal_01.dat",
+		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:{0}:xcom3/ufodata/pal_01.dat",
 		    i)));
 	}
 	for (int i = 1; i <= 4; i++)
 	{
-		selectionBrackets[3].push_back(fw().data->loadImage(format("city/city-bracket-%d.png", i)));
+		selectionBrackets[3].push_back(
+		    fw().data->loadImage(format("city/city-bracket-{0}.png", i)));
 	}
 
 	selectionImageFriendlySmall = fw().data->loadImage("battle/map-selection-small.png");
@@ -123,10 +125,10 @@ void CityTileView::eventOccurred(Event *e)
 			{
 				case SDLK_w:
 				{
-					DEBUG_SHOW_ALIEN = !DEBUG_SHOW_ALIEN;
+					DEBUG_FORCE_ALIEN_DIMENSION = !DEBUG_FORCE_ALIEN_DIMENSION;
 					return;
 				}
-				case SDLK_p:
+				case SDLK_t:
 				{
 					DEBUG_SHOW_VEHICLE_TARGETS = !DEBUG_SHOW_VEHICLE_TARGETS;
 					return;
@@ -137,38 +139,38 @@ void CityTileView::eventOccurred(Event *e)
 					return;
 				}
 				case SDLK_PAGEUP:
-					if (DEBUG_LAYER == -1 || DEBUG_LAYER >= map.size.z)
+					if (DEBUG_ISOLATED_LAYER == -1 || DEBUG_ISOLATED_LAYER >= map.size.z)
 					{
-						DEBUG_LAYER = 0;
+						DEBUG_ISOLATED_LAYER = 0;
 					}
 					else
 					{
-						DEBUG_LAYER++;
+						DEBUG_ISOLATED_LAYER++;
 					}
 					return;
 				case SDLK_PAGEDOWN:
-					if (DEBUG_LAYER <= 0)
+					if (DEBUG_ISOLATED_LAYER <= 0)
 					{
-						DEBUG_LAYER = 0;
+						DEBUG_ISOLATED_LAYER = 0;
 					}
 					else
 					{
-						DEBUG_LAYER--;
+						DEBUG_ISOLATED_LAYER--;
 					}
 					return;
 				case SDLK_F3:
 				{
-					DEBUG_SHOW_MISC_TYPE++;
-					DEBUG_SHOW_MISC_TYPE = DEBUG_SHOW_MISC_TYPE % 6;
-					if (DEBUG_SHOW_MISC_TYPE)
+					DEBUG_WALK_MODE_DISPLAY++;
+					DEBUG_WALK_MODE_DISPLAY = DEBUG_WALK_MODE_DISPLAY % 6;
+					if (DEBUG_WALK_MODE_DISPLAY)
 					{
-						DEBUG_SHOW_SLOPES = false;
-						DEBUG_SHOW_TUBE = false;
+						DEBUG_SHOW_HILLS = false;
+						DEBUG_SHOW_TUBES = false;
 						DEBUG_SHOW_ROADS = false;
 						DEBUG_SHOW_ALIEN_CREW = false;
-						DEBUG_LAYER = -1;
+						DEBUG_ISOLATED_LAYER = -1;
 					}
-					LogWarning("Debug walk type display set to %d", DEBUG_SHOW_MISC_TYPE);
+					LogWarning("Debug walk type display set to {0}", DEBUG_WALK_MODE_DISPLAY);
 					return;
 				}
 				case SDLK_F5:
@@ -182,26 +184,26 @@ void CityTileView::eventOccurred(Event *e)
 					if (DEBUG_SHOW_ALIEN_CREW)
 					{
 						DEBUG_SHOW_ROADS = false;
-						DEBUG_SHOW_SLOPES = false;
-						DEBUG_SHOW_TUBE = false;
-						DEBUG_SHOW_MISC_TYPE = 0;
-						DEBUG_LAYER = -1;
+						DEBUG_SHOW_HILLS = false;
+						DEBUG_SHOW_TUBES = false;
+						DEBUG_WALK_MODE_DISPLAY = 0;
+						DEBUG_ISOLATED_LAYER = -1;
 					}
-					LogWarning("Debug Alien display set to %s", DEBUG_SHOW_ALIEN_CREW);
+					LogWarning("Debug Alien display set to {0}", DEBUG_SHOW_ALIEN_CREW);
 					return;
 				}
 				case SDLK_F12:
 				{
-					DEBUG_SHOW_SLOPES = !DEBUG_SHOW_SLOPES;
-					if (DEBUG_SHOW_SLOPES)
+					DEBUG_SHOW_HILLS = !DEBUG_SHOW_HILLS;
+					if (DEBUG_SHOW_HILLS)
 					{
 						DEBUG_SHOW_ALIEN_CREW = false;
-						DEBUG_SHOW_TUBE = false;
+						DEBUG_SHOW_TUBES = false;
 						DEBUG_SHOW_ROADS = false;
-						DEBUG_SHOW_MISC_TYPE = 0;
-						DEBUG_LAYER = -1;
+						DEBUG_WALK_MODE_DISPLAY = 0;
+						DEBUG_ISOLATED_LAYER = -1;
 					}
-					LogWarning("Debug slopes display set to %s", DEBUG_SHOW_SLOPES);
+					LogWarning("Debug slopes display set to {0}", DEBUG_SHOW_HILLS);
 					return;
 				}
 				case SDLK_F11:
@@ -210,51 +212,51 @@ void CityTileView::eventOccurred(Event *e)
 					if (DEBUG_SHOW_ROADS)
 					{
 						DEBUG_SHOW_ALIEN_CREW = false;
-						DEBUG_SHOW_TUBE = false;
-						DEBUG_SHOW_SLOPES = false;
-						DEBUG_SHOW_MISC_TYPE = 0;
-						DEBUG_LAYER = -1;
+						DEBUG_SHOW_TUBES = false;
+						DEBUG_SHOW_HILLS = false;
+						DEBUG_WALK_MODE_DISPLAY = 0;
+						DEBUG_ISOLATED_LAYER = -1;
 					}
-					LogWarning("Debug roads display set to %s", DEBUG_SHOW_ROADS);
+					LogWarning("Debug roads display set to {0}", DEBUG_SHOW_ROADS);
 					return;
 				}
 				case SDLK_F10:
 				{
-					DEBUG_SHOW_TUBE = !DEBUG_SHOW_TUBE;
-					if (DEBUG_SHOW_TUBE)
+					DEBUG_SHOW_TUBES = !DEBUG_SHOW_TUBES;
+					if (DEBUG_SHOW_TUBES)
 					{
 						DEBUG_SHOW_ROADS = false;
-						DEBUG_SHOW_SLOPES = false;
+						DEBUG_SHOW_HILLS = false;
 						DEBUG_SHOW_ALIEN_CREW = false;
-						DEBUG_SHOW_MISC_TYPE = 0;
-						DEBUG_LAYER = -1;
+						DEBUG_WALK_MODE_DISPLAY = 0;
+						DEBUG_ISOLATED_LAYER = -1;
 					}
-					LogWarning("Debug tube display set to %s", DEBUG_SHOW_TUBE);
+					LogWarning("Debug tube display set to {0}", DEBUG_SHOW_TUBES);
 					return;
 				}
 				case SDLK_KP_0:
-					DEBUG_DIRECTION = -1;
+					DEBUG_CONNECTION_FILTER = -1;
 					return;
 				case SDLK_KP_5:
-					DEBUG_ONLY_TYPE = !DEBUG_ONLY_TYPE;
+					DEBUG_STRICT_TILE_FILTER = !DEBUG_STRICT_TILE_FILTER;
 					return;
 				case SDLK_KP_9:
-					DEBUG_DIRECTION = 0;
+					DEBUG_CONNECTION_FILTER = 0;
 					return;
 				case SDLK_KP_3:
-					DEBUG_DIRECTION = 1;
+					DEBUG_CONNECTION_FILTER = 1;
 					return;
 				case SDLK_KP_1:
-					DEBUG_DIRECTION = 2;
+					DEBUG_CONNECTION_FILTER = 2;
 					return;
 				case SDLK_KP_7:
-					DEBUG_DIRECTION = 3;
+					DEBUG_CONNECTION_FILTER = 3;
 					return;
 				case SDLK_KP_8:
-					DEBUG_DIRECTION = 4;
+					DEBUG_CONNECTION_FILTER = 4;
 					return;
 				case SDLK_KP_2:
-					DEBUG_DIRECTION = 5;
+					DEBUG_CONNECTION_FILTER = 5;
 					return;
 				case SDLK_F6:
 				{
@@ -420,9 +422,9 @@ void CityTileView::render()
 									{
 										auto s = std::static_pointer_cast<TileObjectScenery>(obj)
 										             ->getOwner();
-										if (DEBUG_SHOW_MISC_TYPE)
+										if (DEBUG_WALK_MODE_DISPLAY)
 										{
-											switch (DEBUG_SHOW_MISC_TYPE)
+											switch (DEBUG_WALK_MODE_DISPLAY)
 											{
 												case 5:
 													visible = s->type->basement;
@@ -435,38 +437,38 @@ void CityTileView::render()
 												case 1:
 												case 0:
 													visible = (int)s->type->walk_mode ==
-													          DEBUG_SHOW_MISC_TYPE - 1;
+													          DEBUG_WALK_MODE_DISPLAY - 1;
 													break;
 												default:
-													LogError("Unhandled DEBUG_SHOW_WALK_TYPE %d",
-													         DEBUG_SHOW_MISC_TYPE);
-													DEBUG_SHOW_MISC_TYPE = 0;
+													LogError("Unhandled DEBUG_SHOW_WALK_TYPE {0}",
+													         DEBUG_WALK_MODE_DISPLAY);
+													DEBUG_WALK_MODE_DISPLAY = 0;
 													break;
 											}
 										}
-										if (DEBUG_LAYER >= 0)
+										if (DEBUG_ISOLATED_LAYER >= 0)
 										{
-											visible = s->initialPosition.z == DEBUG_LAYER;
+											visible = s->initialPosition.z == DEBUG_ISOLATED_LAYER;
 										}
-										if (DEBUG_SHOW_SLOPES)
+										if (DEBUG_SHOW_HILLS)
 										{
-											if (DEBUG_DIRECTION == -1)
+											if (DEBUG_CONNECTION_FILTER == -1)
 											{
 												visible = s->type->hill[0] || s->type->hill[1] ||
 												          s->type->hill[2] || s->type->hill[3];
 											}
 											else
 											{
-												visible = s->type->hill[DEBUG_DIRECTION];
+												visible = s->type->hill[DEBUG_CONNECTION_FILTER];
 											}
 											visible =
-											    visible && (!DEBUG_ONLY_TYPE ||
+											    visible && (!DEBUG_STRICT_TILE_FILTER ||
 											                s->type->tile_type ==
 											                    SceneryTileType::TileType::Road);
 										}
 										if (DEBUG_SHOW_ROADS)
 										{
-											if (DEBUG_DIRECTION == -1)
+											if (DEBUG_CONNECTION_FILTER == -1)
 											{
 												visible = s->type->connection[0] ||
 												          s->type->connection[1] ||
@@ -475,16 +477,17 @@ void CityTileView::render()
 											}
 											else
 											{
-												visible = s->type->connection[DEBUG_DIRECTION];
+												visible =
+												    s->type->connection[DEBUG_CONNECTION_FILTER];
 											}
 											visible =
-											    visible && (!DEBUG_ONLY_TYPE ||
+											    visible && (!DEBUG_STRICT_TILE_FILTER ||
 											                s->type->tile_type ==
 											                    SceneryTileType::TileType::Road);
 										}
-										if (DEBUG_SHOW_TUBE)
+										if (DEBUG_SHOW_TUBES)
 										{
-											if (DEBUG_DIRECTION == -1)
+											if (DEBUG_CONNECTION_FILTER == -1)
 											{
 												visible = s->type->tube[0] || s->type->tube[1] ||
 												          s->type->tube[2] || s->type->tube[3] ||
@@ -492,9 +495,10 @@ void CityTileView::render()
 											}
 											else
 											{
-												visible = s->type->tube[DEBUG_DIRECTION];
+												visible = s->type->tube[DEBUG_CONNECTION_FILTER];
 											}
-											visible = visible || (!DEBUG_ONLY_TYPE && s->building);
+											visible = visible ||
+											          (!DEBUG_STRICT_TILE_FILTER && s->building);
 										}
 									}
 									default:
@@ -670,13 +674,13 @@ void CityTileView::render()
 
 				for (auto &b : state.current_city->buildings)
 				{
-					if (b.second->owner != state.current_city->cityViewSelectedOrganisation)
+					if (b->owner != state.current_city->cityViewSelectedOrganisation)
 					{
 						continue;
 					}
-					Vec3<float> posA = {b.second->bounds.p0.x, b.second->bounds.p0.y, 0};
+					Vec3<float> posA = {b->bounds.p0.x, b->bounds.p0.y, 0};
 					Vec2<float> screenPosA = this->tileToOffsetScreenCoords(posA);
-					Vec3<float> posB = {b.second->bounds.p1.x, b.second->bounds.p1.y, 0};
+					Vec3<float> posB = {b->bounds.p1.x, b->bounds.p1.y, 0};
 					Vec2<float> screenPosB = this->tileToOffsetScreenCoords(posB);
 
 					// Apply offset to borders every half-second
@@ -899,9 +903,9 @@ void CityTileView::render()
 			{
 				for (auto &b : state.current_city->buildings)
 				{
-					Vec2<float> pos = tileToOffsetScreenCoords(
-					    Vec3<int>{b.second->bounds.p0.x, b.second->bounds.p0.y, 2});
-					for (auto &a : b.second->current_crew)
+					Vec2<float> pos =
+					    tileToOffsetScreenCoords(Vec3<int>{b->bounds.p0.x, b->bounds.p0.y, 2});
+					for (auto &a : b->current_crew)
 					{
 						for (int i = 0; i < a.second; i++)
 						{
@@ -919,19 +923,19 @@ void CityTileView::render()
 			for (auto &b : state.current_city->buildings)
 			{
 				// Detection of aliens
-				if (b.second->detected)
+				if (b->detected)
 				{
 					float initialRadius = std::max(alertImage->size.x, alertImage->size.y);
 					// Eventually scale to 1/2 the size, but start with some bonus time of full
 					// size,
 					// so that it doesn't become distorted immediately, that's why we add extra 0.05
-					float radius = std::min(initialRadius,
-					                        initialRadius * (float)b.second->ticksDetectionTimeOut /
-					                                (float)TICKS_DETECTION_TIMEOUT / 2.0f +
-					                            0.55f);
+					float radius =
+					    std::min(initialRadius, initialRadius * (float)b->ticksDetectionTimeOut /
+					                                    (float)TICKS_DETECTION_TIMEOUT / 2.0f +
+					                                0.55f);
 					Vec2<float> pos = tileToOffsetScreenCoords(
-					    Vec3<int>{(b.second->bounds.p0.x + b.second->bounds.p1.x) / 2,
-					              (b.second->bounds.p0.y + b.second->bounds.p1.y) / 2, 2});
+					    Vec3<int>{(b->bounds.p0.x + b->bounds.p1.x) / 2,
+					              (b->bounds.p0.y + b->bounds.p1.y) / 2, 2});
 					pos -= Vec2<float>{radius / 2.0f, radius / 2.0f};
 
 					if (radius == initialRadius)
@@ -946,7 +950,7 @@ void CityTileView::render()
 				// Cargo for player
 				bool hasCargo = false;
 				uint64_t nearestExpiry = UINT64_MAX;
-				for (auto &c : b.second->cargo)
+				for (auto &c : b->cargo)
 				{
 					if (c.count > 0 && c.destination->owner == state.getPlayer())
 					{
@@ -965,8 +969,8 @@ void CityTileView::render()
 					                                               (float)TICKS_CARGO_TTL / 2.0f +
 					                                           0.55f);
 					Vec2<float> pos = tileToOffsetScreenCoords(
-					    Vec3<int>{(b.second->bounds.p0.x + b.second->bounds.p1.x) / 2,
-					              (b.second->bounds.p0.y + b.second->bounds.p1.y) / 2, 2});
+					    Vec3<int>{(b->bounds.p0.x + b->bounds.p1.x) / 2,
+					              (b->bounds.p0.y + b->bounds.p1.y) / 2, 2});
 					pos -= Vec2<float>{radius / 2.0f, radius / 2.0f};
 
 					if (radius == initialRadius)
@@ -1082,7 +1086,7 @@ void CityTileView::update()
 		}
 		else
 		{
-			LogError("Unhandled hoursClamped %d", hour);
+			LogError("Unhandled hoursClamped {0}", hour);
 		}
 
 		for (int i = 0; i < 256; i++)

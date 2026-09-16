@@ -4,7 +4,7 @@
 #include "game/state/stateobject.h"
 #include "library/sp.h"
 #include "library/strings.h"
-#include <map>
+#include <list>
 
 namespace OpenApoc
 {
@@ -43,7 +43,10 @@ class UfopaediaCategory : public StateObject<UfopaediaCategory>
 	UString title;
 	UString description;
 	sp<LazyImage> background;
-	StateRefMap<UfopaediaEntry> entries;
+	// Ordered list of entry references. Entries themselves are owned by
+	// GameState::ufopaedia_entries; this list just tracks category membership
+	// and display order.
+	std::list<StateRef<UfopaediaEntry>> entries;
 };
 
 } // namespace OpenApoc

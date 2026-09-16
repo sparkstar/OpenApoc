@@ -9,7 +9,6 @@
 #include "library/strings.h"
 #include "library/vec.h"
 #include <list>
-#include <map>
 
 // Uncomment to allow projectiles to shoot down friendly projectiles
 // #define DEBUG_ALLOW_PROJECTILE_ON_PROJECTILE_FRIENDLY_FIRE
@@ -57,6 +56,9 @@ static const int FV_SCRAPPED_COST_PERCENT = 25;
 static const int FUEL_TICKS_PER_SECOND = 144;
 // How much ticks is required to spend one unit of fuel
 static const int FUEL_TICKS_PER_UNIT = 40000;
+// Correction factor for turning slowdown mechanic, purely found by data analysis, could not
+// establish any logical conclusion
+static const float TURNING_SLOW_DOWN_CORRECTION = 38.893f;
 
 class Image;
 class TileObjectVehicle;
@@ -385,6 +387,9 @@ class Vehicle : public StateObject<Vehicle>,
 	std::list<std::pair<Vec2<int>, sp<Equipment>>> getEquipment() const override;
 
 	const UString getFormattedVehicleNameForEventMessage(GameState &state) const;
+
+	const bool cargoContainsAlienLoot() const;
+	bool cargoDeliverableAtCurrentBuilding(const Cargo &c) const;
 
 	// Following members are not serialized, but rather setup during game
 

@@ -1,8 +1,6 @@
 #include "game/state/battle/battleexplosion.h"
 #include "framework/configfile.h"
 #include "framework/framework.h"
-#include "framework/logger.h"
-#include "framework/sound.h"
 #include "game/state/battle/battle.h"
 #include "game/state/battle/battlehazard.h"
 #include "game/state/battle/battleitem.h"
@@ -263,6 +261,10 @@ void BattleExplosion::expand(GameState &state, const TileMap &map, const Vec3<in
 	{
 		auto pos = pair.first + from;
 		auto tile = map.getTile(pos);
+		if (!tile)
+		{
+			continue;
+		}
 		for (auto &obj : tile->ownedObjects)
 		{
 			if (pair.second.find(obj->getType()) != pair.second.end())
@@ -320,7 +322,7 @@ void BattleExplosion::expand(GameState &state, const TileMap &map, const Vec3<in
 				}
 			}
 			doodadType = {&state,
-			              format("DOODAD_BATTLE_EXPLOSION_%d%d", velocity.x + 1, velocity.y + 1)};
+			              format("DOODAD_BATTLE_EXPLOSION_{0}{1}", velocity.x + 1, velocity.y + 1)};
 		}
 		Vec3<float> doodadPos = to;
 		doodadPos += Vec3<float>{0.5f, 0.5f, 0.5f};

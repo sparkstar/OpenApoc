@@ -1,6 +1,5 @@
 #pragma once
 
-#include "framework/image.h"
 #include "game/state/gametime.h"
 #include "game/state/rules/aequipmenttype.h"
 #include "game/state/rules/agenttype.h"
@@ -20,6 +19,7 @@ namespace OpenApoc
 {
 
 static const unsigned TELEPORT_TICKS_REQUIRED_AGENT = TICKS_PER_SECOND * 30;
+static const int MIND_SHIELD_PSI_DEFENCE_BONUS = 20;
 
 class Organisation;
 class AEquipment;
@@ -88,6 +88,7 @@ class Agent : public StateObject<Agent>,
 	GameTime hiredOn;
 	unsigned int missionCount = 0;
 	unsigned int killCount = 0;
+	unsigned int victoryPoints = 0;
 
 	unsigned int teleportTicksAccumulated = 0;
 	bool canTeleport() const;
@@ -143,7 +144,7 @@ class Agent : public StateObject<Agent>,
 	Vec3<float> goalPosition = {0, 0, 0};
 
 	StateRef<Lab> lab_assigned = nullptr;
-	bool assigned_to_lab = false;
+	bool isAssignedToLab() const { return lab_assigned != nullptr; }
 
 	StateRef<BattleUnit> unit;
 
@@ -173,6 +174,7 @@ class Agent : public StateObject<Agent>,
 	void addEquipment(GameState &state, Vec2<int> pos, sp<AEquipment> object);
 	void removeEquipment(GameState &state, sp<AEquipment> object);
 	void updateSpeed();
+	void updatePsiDefence();
 	// Called when current stats were changed and modified stats need to catch up
 	void updateModifiedStats();
 	bool canRun() { return modified_stats.canRun(); }
@@ -239,10 +241,12 @@ class Agent : public StateObject<Agent>,
 	unsigned int getDaysInService(const GameState &state) const;
 	unsigned int getKills() const;
 	unsigned int getMissions() const;
-	unsigned int getMedalTier() const;
+	unsigned int getVictoryPoints(const GameState &state) const;
+	unsigned int getMedalTier(const GameState &state) const;
 
 	void incrementMissionCount();
 	void incrementKillCount();
+	void recordHealthLost(int amount);
 
 	void destroy() override;
 };

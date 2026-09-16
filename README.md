@@ -1,19 +1,12 @@
 # OpenApocalypse [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=Are%20you%20a%20fan%20of%20X-Com%20Apocalypse?%20OpenApoc%20is%20a%20clone%20of%20this%20great%20game%20-%20contribute!%20https://github.com/OpenApoc/OpenApoc&hashtags=games,openapoc,xcom)
 
-> OpenApoc is an open-source re-implementation of the original [X-COM: Apocalypse](https://www.ufopaedia.org/index.php/Apocalypse), that requires the original files to run, licensed under the GPL3 and written in C++ / SDL2. It was originally founded by PmProg in July 2014, and has since grown in [community](https://www.ufopaedia.org/index.php/Credits_(OpenApoc)).
+> OpenApoc is an open-source re-implementation of the original [X-COM: Apocalypse](https://www.ufopaedia.org/index.php/Apocalypse), that requires the original files to run, licensed under the GPL3 and written in C++ / SDL2. It was originally founded by PmProg in July 2014, and has since grown a significant [community](https://www.ufopaedia.org/index.php/Credits_(OpenApoc)).
 
-[![Linux Build Status](https://img.shields.io/travis/OpenApoc/OpenApoc?branch=master&label=Travis%20Linux&logo=Travis%20CI&logoColor=ffffff&labelColor=282828)](https://travis-ci.com/github/OpenApoc/OpenApoc)
 [![Windows Build Status](https://img.shields.io/appveyor/build/OpenApoc/openapoc?branch=master&label=AppVeyor%20Windows&logo=appveyor&logoColor=ffffff&labelColor=282828)](https://ci.appveyor.com/project/openapoc/openapoc/branch/master)
 [![Openapoc issues](https://img.shields.io/github/issues-raw/OpenApoc/OpenApoc?color=1182c3&logo=GitHub&labelColor=282828)](https://github.com/openapoc/openapoc/issues)
 [![Translate OpenApoc](https://img.shields.io/badge/Translate-Openapoc-blue.svg)](https://www.transifex.com/x-com-apocalypse/apocalypse/)
-[![OpenApoc GPL3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/OpenApoc/OpenApoc/blob/master/LICENSE)\
-[![Openapoc forum](https://img.shields.io/badge/Visit%20our-forum-orange.svg)](http://openapoc.org)
-[![Openapoc IRC chat](https://img.shields.io/badge/IRC-devs%20chat-brightgreen.svg)](http://webchat.freenode.net/?channels=openapoc)
-[![Openapoc Discord](https://img.shields.io/discord/142798944970211328?label=Discord&logo=discord&logoColor=ffffff&labelColor=7289DA&color=2c2f33)](https://discord.gg/d6DAHEb) 
-[![Openapoc Facebook](https://img.shields.io/static/v1?label=FB&logo=Facebook&logoColor=ffffff&message=Subscribe%20|%20755&color=282828&labelColor=1877f2)](https://fb.com/openapoc)
-[![Openapoc Vkontakte](https://img.shields.io/static/v1?label=VK&logo=vk&logoColor=ffffff&message=Vstupaj%20|%20447&color=282828&labelColor=2787f5)](https://vk.com/openapoc)
-[![Openapoc Reddit](https://img.shields.io/reddit/subreddit-subscribers/OpenApoc?color=orange&logo=Reddit&logoColor=ffffff&labelColor=282828)](https://reddit.com/r/openapoc)
-[![Openapoc Youtube](https://img.shields.io/static/v1?label=Youtube&logo=Youtube&logoColor=ffffff&message=Subscribe%20|%20365&color=282828&labelColor=FF0000)](https://www.youtube.com/c/openapoc)
+[![OpenApoc GPL3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/OpenApoc/OpenApoc/blob/master/LICENSE)
+[![Openapoc Discord](https://img.shields.io/discord/142798944970211328?label=Discord&logo=discord&logoColor=ffffff&labelColor=7289DA&color=2c2f33)](https://discord.gg/f8Rayre)
 
 <p align="center"><img src="https://i.imgur.com/XxudxVj.jpg"/></p>
 
@@ -33,44 +26,42 @@
 
 
 ## Copyright
-All rights for the original game and its resources belong to their respective owners. We do not encourage and do not support any form of illegal usage of the original game. We strongly advise to purchase the original game on GOG or other platforms. Pirated ISOs are not supported and will cause issues such as crashes and map problems with OpenApoc.
+All rights for the original game and its resources belong to their respective owners.
+We do not encourage and do not support any form of illegal usage of the original game.
+We strongly advise to purchase the original game on STEAM or another platform of your choosing.
+Pirated disc images and archives are not supported and will cause issues such as crashes and map problems with OpenApoc.
 
 ## Key Features
 
-* Unlimited modding capabilities, which was not possible in the original
-* Port the game to any platform you like (windows, linux, android etc)
-* Support for modern screen resolutions
-* Added a full debug system ([hot keys](https://github.com/OpenApoc/OpenApoc/blob/master/README_HOTKEYS.txt), etc.)
-* Added 'more options' menu (with more than 40 improvements)
-* Added skirmish module (fast fight)
-* The new engine has ample opportunities for expansion and changes:
-  * High FPS, smooth sound during the game without bugs from original
-  * No limitations which were in vanilla
-  * Modern formats
-* After release, we can add Julian Gollop's cut ideas to the game through mods. Many have already been added but they need functionality and balance.
-* [![Julian Gollop](https://img.shields.io/reddit/user-karma/combined/JulianGollop?style=social)](https://www.reddit.com/user/JulianGollop/) "Yes, I am aware of the openApoc project and I very much do support it." 
-* Fans creating Big Apoc Concept, for modders, thats should make OpenApoc more balanced, to provide:
-  * A variety of interesting gameplay solutions
-  * Make the game more complex and diverse
-  * L.O.R.E more fulfilling, deep and mysterious, intertwined with real history and other games 
-  * Ending the game can be more interesting and less predictable
+* [![Julian Gollop](https://img.shields.io/reddit/user-karma/combined/JulianGollop?style=social)](https://www.reddit.com/user/JulianGollop/) "Yes, I am aware of the openApoc project and I very much do support it." — [Julian Gollop, Reddit AMA (2017)](https://www.reddit.com/r/PhoenixPoint/comments/60tn6x/i_am_the_designer_of_xcom_and_phoenix_point_ask/)
+* Full modding capability - You can add or change almost anything!
+* Options for modding that allow opportunity to make OpenApoc:
+  * More balanced
+  * More diverse
+  * More immersive
+* Human-Readable Savegame editing - It's all XML in a ZIP archvive so you can edit/tweak in progress games to your liking!
+* Support for modern screen resolutions and display scaling at a silky smooth 60fps
+* Added a 'More Options' menu that allows players to select dozens of new optional improvements and enhancements
+* Added a full debug system ([Hot Keys](https://github.com/OpenApoc/OpenApoc/blob/master/README_HOTKEYS.md), etc.)
+* Port the game to any platform you like (Windows, Linux, Etc.)
+* Added a Skirmish Mode for quick fights and custom battles (Experimental)
+* The new engine has ample opportunities for expansion and refinements including:
+  * High FPS
+  * Smooth sound playback with none of the pop/clicks/stutters of the original game
+* The potential to add cut and missing features from the Original Game - some of these are already included even at current Alpha state or with the handful of mods already available!
 
 ## What's left?
 
-1. [TO HAVE A TRULY PLAYABLE ALPHA STATE (DONE)](https://github.com/OpenApoc/OpenApoc/issues/263)
-2. [TO REACH A BETA STATE (When All features implemented)](https://github.com/OpenApoc/OpenApoc/issues/264)
-3. [TO REACH OPENAPOC RELEASE 1.0](https://github.com/OpenApoc/OpenApoc/issues/265)
+1. [TO HAVE A TRULY PLAYABLE ALPHA STATE](https://github.com/OpenApoc/OpenApoc/issues/263)
+2. [TO REACH A BETA STATE (All core Original Game features implemented)](https://github.com/OpenApoc/OpenApoc/issues/264)
+3. [TO REACH OPENAPOC RELEASE 1.0 (Final polishing and testing to match or exceed Original Game state)](https://github.com/OpenApoc/OpenApoc/issues/265)
 4. [Modding Functions, Extra Features, Enhancements and Quality of Life Updates](https://github.com/OpenApoc/OpenApoc/issues/941)
 
 
 ## Contribute and FAQ
 
-http://openapoc.org/#contribute
->Here you find news, detailing how you can participate in project. 
-You can support the project by testing, translating, modding, drawing, modeling, concepting etc..
-
-http://openapoc.org/#faq
->Here you find the detailed FAQ (frequently asked questions)
+Please use [Discord](https://discord.gg/f8Rayre) for contributing and FAQ.
+> You can support the project by testing, translating, modding, drawing, modeling, concepting etc.
 
 
 ## Building
@@ -89,11 +80,11 @@ The following libraries are also used, but are shipped as submodules in the repo
 * [GLM](https://glm.g-truc.net) - Math library.
 * [libsmacker](https://sourceforge.net/projects/libsmacker/) - Decoder for .smk video files.
 * [lodepng](https://github.com/lvandeve/lodepng) - Reading/writing PNG image files.
-* [Lua](https://www.lua.org/) - Scripting language.
 * [miniz](https://github.com/richgel999/miniz) - Zlib-comptible compression library.
 * [physfs](https://icculus.org/physfs/) - Library for reading data from .iso files or directory trees (Note: We use a patched version, available on [GitHub](https://github.com/JonnyH/physfs-hg-import/tree/fix-iso) - required to read the .iso files we use).
 * [pugixml](https://pugixml.org) - XML library used for reading/writing the game data files.
 * [fmtlib](https://github.com/fmtlib/fmt) - A c++ string formatting library - proposed for c++20 standard.
+* [magic_enum](https://github.com/Neargye/magic_enum) - Header-only C++17 library provides static reflection for enums, work with any enum type without any macro or boilerplate code.
 
 
 ### Building on Windows
@@ -112,13 +103,13 @@ git submodule update --init --recursive
   * For x64 builds:
 
 ```cmd
-vcpkg --triplet x64-windows install sdl2 boost-locale boost-program-options boost-uuid boost-crc qt5-base libvorbis
+vcpkg --triplet x64-windows install sdl2 boost-locale boost-program-options boost-uuid boost-crc qt-base6-dev libvorbis
 ```
 
   * For x86 builds:
 
 ```cmd
-vcpkg --triplet x86-windows install sdl2 boost-locale boost-program-options boost-uuid boost-crc qt5-base libvorbis
+vcpkg --triplet x86-windows install sdl2 boost-locale boost-program-options boost-uuid boost-crc qt-base6-dev libvorbis
 ```
 
   * For list of all supported by Vcpkg architectures: `vcpkg help triplet`
@@ -146,28 +137,36 @@ vcpkg --triplet x86-windows install sdl2 boost-locale boost-program-options boos
 
 ### Building on Linux
 
-(Tested on Ubuntu 22.04)
+(Tested on Ubuntu 22.04 and 24.04)
+
+depending on your Linux-distro:
 
 * On Ubuntu, install the following packages:
 
 ```sh
-sudo apt-get install sdl2-dev cmake build-essential git libunwind8-dev libboost-locale-dev libboost-program-options-dev qtbase5-dev libvorbis-dev
+sudo apt-get install libsdl2-dev cmake build-essential git libunwind8-dev libboost-locale-dev libboost-program-options-dev qt6-base-dev libvorbis-dev
 ```
 
 * On Mageia, install the following packages as root:
 
 ```sh
-urpmi "cmake(sdl2)" libstdc++-static-devel boost-devel boost unwind-devel task-c++-devel cmake git qtbase5-devel libvorbis-devel
+urpmi "cmake(sdl2)" libstdc++-static-devel boost-devel boost unwind-devel task-c++-devel cmake git qt6-devel libvorbis-devel
 ```
 
 * On Fedora or other RedHat distro, install the folowing packages as root:
 
 ```sh
 yum groupinstall "Development Tools" "Development Libraries"
-yum install git SDL2-devel cmake libunwind-devel qt5-qtbase-devel libvorbis-devel
+yum install git SDL2-devel cmake libunwind-devel qt6-qtbase-devel libvorbis-devel
 ```
 
-* Checkout OpenApoc from GitHub.
+
+
+* Checkout OpenApoc from GitHub (this will create a new folder names 'OpenApoc') :
+```sh
+git clone https://github.com/OpenApoc/OpenApoc.git
+```
+
 * Fetch the dependencies from git with the following terminal command (run from the just-created OpenApoc folder).
 
 ```sh
@@ -205,7 +204,7 @@ make -j4
 
 ### Building on macOS
 
-(Tested on macOS Ventura 13.0 (22A380)
+(Tested on macOS Sequoia 15.6 (24G84)
 
 * On macOS, install the [Homebrew](https://brew.sh):
 
@@ -229,8 +228,18 @@ git submodule update --init --recursive
 * Use the homebrew install the following dependencies:
 
 ```sh
-brew install cmake boost pkg-config sdl2 qt@5 libvorbis
-echo 'export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"' >> ~/.bashrc
+brew install cmake boost pkg-config sdl2 qt@6 libvorbis
+```
+
+* Add the Qt install to path.
+
+* If using zsh (MacOS default since Catalina 10.15):
+```sh
+echo 'export PATH="/opt/homebrew/opt/qt@6/bin:$PATH"' >> ~/.zprofile
+```
+* Or if using bash:
+```sh
+echo 'export PATH="/opt/homebrew/opt/qt@6/bin:$PATH"' >> ~/.bashrc
 ```
 
 * Copy the cd.iso file to the 'data' directory under the repository root (Note - despite dosbox having good linux support, the steam version of X-Com Apocalypse will only install if Steam Play is enabled).
@@ -273,16 +282,16 @@ https://www.ufopaedia.org/index.php/Coding_Style_(OpenApoc)
 
 OPENGL 2.0 SUPPORTIVE VIDEO CARDS ARE REQUIRED
 
-WINDOWS USERS: You will require the LATEST Visual C++ Libraries obtained from windows update to run OpenApoc
+WINDOWS USERS: You will require the LATEST Visual C++ Redistributable obtained from windows update to run OpenApoc
 https://docs.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
 
-(Keep in mind that OpenApoc is ALPHA STATE - this means bugs, crushes and not all features implemented, use our bug-tracker at https://github.com/OpenApoc/OpenApoc/issues to report bugs and navigate known ones)
+Simple steps to play OpenApoc on Windows right now
+(Keep in mind that it is ALPHA - this means bugs, crashes and not all features implemented, use our bug-tracker at https://github.com/OpenApoc/OpenApoc/issues to report bugs and navigate known ones)
 
-1) Download the OpenApoc core files: [![Windows Build Status](https://img.shields.io/appveyor/build/OpenApoc/openapoc?branch=master&label=AppVeyor%20Windows&logo=appveyor&logoColor=ffffff&labelColor=282828)](https://ci.appveyor.com/project/openapoc/openapoc/branch/master)  (Latest master build)
-- If the build link above doesn't work, visit  https://ci.appveyor.com/project/OpenApoc/openapoc/history
+1) Download the OpenApoc core files from https://github.com/OpenApoc/OpenApoc/releases
+- For experimental builds visit  https://ci.appveyor.com/project/OpenApoc/openapoc/history
 - If you see a green bar next to the latest build then you can download it, click a build that is green, or use "Show More" to list all builds
 - Click ARTIFACTS (Currently only Windows x64)
-- If there are no artifacts use https://github.com/OpenApoc/OpenApoc/releases for the latest Winx64 compile
 - Download the option that ends with a ".exe" (and without "debug" in it)
 - Run the downloaded exe installer, this will guide you through the installation
 - Use "portable install" if you want saves and settings to remain in the install directory
@@ -293,20 +302,22 @@ https://docs.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msv
 - If the disc image is in .iso format, rename it to "cd.iso"
 - We also support the GOG .cue / .bin files!
 
-3) Put cd.iso (image or folder) into the data folder under the specified OpenApoc install folder
+3) Put cd.iso (image or folder) into the "data" folder under the specified OpenApoc install folder
 - If you have already specified the "cd.iso" location in the installer, you don't need to do this step
 - To use GOG .cue/.bin you rename the XCOM.cue file to "cd.iso", put that in the OpenApoc data folder, then put the XCOM.BIN, without renaming it, into the data folder too
 
 4) Run and enjoy!
 
+Linux and macOS users: After compiling (see [Building on Linux](#building-on-linux) or [Building on macOS](#building-on-macos) above), copy `cd.iso` into the `data/` directory and run the executable from the repository root.
+
 
 ## Contact us
 
-If you're interested, please visit our [website](http://openapoc.org).
-* We have [forums](http://openapoc.org/forum/) - please pop by and introduce yourself!
-* We have an [Discord](https://discord.gg/f8Rayre) channel
-* We have an IRC channel on [Freenode](http://webchat.freenode.net/?channels=openapoc) - [#openapoc](irc://irc.freenode.net/#openapoc).
+* We have a [Discord](https://discord.gg/f8Rayre) — MOST ACTIVE PLACE FOR ALL THINGS OPENAPOC!
 * We have a [Youtube](https://www.youtube.com/c/OpenApoc) channel.
+
+## Unofficial and Community Contacts
+
 * We have a [Facebook](https://www.facebook.com/openapoc) page.
-* We have a [Vkontakte](https://vk.com/openapoc) page.
 * We have a [Reddit](https://reddit.com/r/openapoc) page.
+* All VK Presence is currently unofficial

@@ -5,6 +5,7 @@
 #include "library/rect.h"
 #include "library/sp.h"
 #include "library/vec.h"
+#include <list>
 #include <map>
 
 namespace OpenApoc
@@ -25,6 +26,7 @@ class BitmapFont;
 class Graphic;
 class Organisation;
 class Base;
+class ScrollBar;
 enum class BodyPart;
 
 class AEquipScreen : public Stage
@@ -65,8 +67,8 @@ class AEquipScreen : public Stage
 
 	// Items currently on the "ground"
 	std::list<std::tuple<Rect<int>, int, sp<AEquipment>>> inventoryItems;
-	int inventoryPage = 0;
-	void clampInventoryPage();
+	sp<ScrollBar> inventoryScrollBar;
+	void updateInventoryScrollRange();
 
 	// Items temporarily stored inside vehicle (go into vehicle storage when exiting)
 	std::map<sp<Vehicle>, std::list<sp<AEquipment>>> vehicleItems;
@@ -121,7 +123,8 @@ class AEquipScreen : public Stage
 	// if alternative and forced is set then only do alternative or none at all
 	bool tryPickUpItem(sp<Agent> agent, Vec2<int> slotPos, bool alternative,
 	                   bool *alienArtifact = nullptr, bool forced = false);
-	bool tryPickUpItem(Vec2<int> inventoryPos, bool *alienArtifact = nullptr);
+	std::pair<sp<AEquipment>, bool> tryPickUpItem(Vec2<int> inventoryPos,
+	                                              bool *alienArtifact = nullptr);
 	bool tryPickUpItem(const AEquipmentType &item);
 	void pickUpItem(sp<AEquipment> item);
 	bool tryPlaceItem(sp<Agent> agent, Vec2<int> slotPos, bool *insufficientTU = nullptr,

@@ -96,21 +96,20 @@ void TileObject::setPosition(Vec3<float> newPosition)
 		LogError("This == null");
 	}
 	if (newPosition.x < 0 || newPosition.y < 0 || newPosition.z < 0 ||
-	    newPosition.x > map.size.x + 1 || newPosition.y > map.size.y + 1 ||
-	    newPosition.z > map.size.z + 1)
+	    newPosition.x >= map.size.x || newPosition.y >= map.size.y || newPosition.z >= map.size.z)
 	{
-		LogWarning("Trying to place object at %s in map of size %s", newPosition, map.size);
-		newPosition.x = clamp(newPosition.x, 0.0f, (float)map.size.x + 1);
-		newPosition.y = clamp(newPosition.y, 0.0f, (float)map.size.y + 1);
-		newPosition.z = clamp(newPosition.z, 0.0f, (float)map.size.z + 1);
-		LogWarning("Clamped object to %s", newPosition);
+		LogWarning("Trying to place object at {0} in map of size {1}", newPosition, map.size);
+		newPosition.x = clamp(newPosition.x, 0.0f, map.size.x - 0.1f);
+		newPosition.y = clamp(newPosition.y, 0.0f, map.size.y - 0.1f);
+		newPosition.z = clamp(newPosition.z, 0.0f, map.size.z - 0.1f);
+		LogWarning("Clamped object to {0}", newPosition);
 	}
 	this->removeFromMap();
 
 	this->owningTile = map.getTile(newPosition);
 	if (!this->owningTile)
 	{
-		LogError("Failed to get tile for position %s", newPosition);
+		LogError("Failed to get tile for position {0}", newPosition);
 		return;
 	}
 
@@ -142,7 +141,7 @@ void TileObject::setPosition(Vec3<float> newPosition)
 				Tile *intersectingTile = map.getTile(x, y, z);
 				if (!intersectingTile)
 				{
-					LogError("Failed to get intersecting tile at {%d,%d,%d}", x, y, z);
+					LogError("Failed to get intersecting tile at {{{0},{1},{2}}}", x, y, z);
 					continue;
 				}
 				this->intersectingTiles.push_back(intersectingTile);

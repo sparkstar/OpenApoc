@@ -7,18 +7,14 @@
 #include "forms/radiobutton.h"
 #include "forms/scrollbar.h"
 #include "forms/ui.h"
-#include "framework/configfile.h"
 #include "framework/data.h"
 #include "framework/event.h"
-#include "framework/font.h"
 #include "framework/framework.h"
 #include "framework/keycodes.h"
 #include "framework/renderer.h"
 #include "game/state/city/base.h"
 #include "game/state/city/building.h"
 #include "game/state/city/vehicle.h"
-#include "game/state/city/vehiclemission.h"
-#include "game/state/city/vequipment.h"
 #include "game/state/gamestate.h"
 #include "game/state/rules/aequipmenttype.h"
 #include "game/state/shared/aequipment.h"
@@ -27,6 +23,7 @@
 #include "game/ui/general/agentsheet.h"
 #include "game/ui/general/messagebox.h"
 #include "library/strings_format.h"
+#include <algorithm>
 
 namespace OpenApoc
 {
@@ -163,7 +160,13 @@ void RecruitScreen::populateAgentList()
 		if (a.second->owner == player)
 		{
 			// Need to be able to strip agent
-			if (a.second->currentBuilding == a.second->homeBuilding)
+			auto effectiveBuilding =
+			    a.second->currentBuilding
+			        ? a.second->currentBuilding
+			        : (a.second->currentVehicle && a.second->currentVehicle->currentBuilding
+			               ? a.second->currentVehicle->currentBuilding
+			               : nullptr);
+			if (effectiveBuilding == a.second->homeBuilding)
 			{
 				agentLists[bases[a.second->homeBuilding->base.id]].push_back(
 				    ControlGenerator::createLargeAgentControl(*state, a.second, list->Size.x,
@@ -335,10 +338,10 @@ void RecruitScreen::updateFormValues()
 	}
 
 	// Update money
-	int balance = state->getPlayer()->balance + moneyDelta;
-	form->findControlTyped<Label>("TEXT_FUNDS")->setText(Strings::fromInteger(balance));
+	const auto balance = state->getPlayer()->balance + moneyDelta;
+	form->findControlTyped<Label>("TEXT_FUNDS")->setText(state->formatCurrency(balance));
 	form->findControlTyped<Label>("TEXT_FUNDS_DELTA")
-	    ->setText(format("%s%s", moneyDelta > 0 ? "+" : "", Strings::fromInteger(moneyDelta)));
+	    ->setText(format("{0}{1}", moneyDelta > 0 ? "+" : "", state->formatCurrency(moneyDelta)));
 
 	updateBaseHighlight();
 }
@@ -349,7 +352,7 @@ void RecruitScreen::updateBaseHighlight()
 	    state->current_base->getUsage(*state, FacilityType::Capacity::Quarters, lqDelta);
 	fillBaseBar(usage);
 	auto facilityLabel = form->findControlTyped<Label>("FACILITY_FIRST_TEXT");
-	facilityLabel->setText(format("%.f%%", usage));
+	facilityLabel->setText(format("{0:.0f}%", usage));
 }
 
 void RecruitScreen::fillBaseBar(int percent)
@@ -411,7 +414,7 @@ void RecruitScreen::personnelSheet(const Agent &agent, sp<Form> formPersonnelSta
 	formPersonnelStats->findControlTyped<Graphic>("SELECTED_PORTRAIT")
 	    ->setImage(agent.getPortrait().photo);
 	formPersonnelStats->findControlTyped<Label>("VALUE_SKILL")
-	    ->setText(format("%d", agent.getSkill()));
+	    ->setText(format("{0}", agent.getSkill()));
 }
 
 /**
@@ -425,7 +428,7 @@ std::vector<sp<Image>> RecruitScreen::getBigUnitRanks()
 	{
 		bigUnitRanks.push_back(
 		    fw().data->loadImage(format("PCK:xcom3/tacdata/tacbut.pck:xcom3/tacdata/"
-		                                "tacbut.tab:%d:xcom3/tacdata/tactical.pal",
+		                                "tacbut.tab:{0}:xcom3/tacdata/tactical.pal",
 		                                i)));
 	}
 
@@ -476,11 +479,10 @@ void RecruitScreen::attemptCloseScreen()
 
 	if (hired != 0 || fired != 0 || transferred != 0)
 	{
-		UString message =
-		    format("%d %s\n%d %s", hired, tr("unit(s) hired"), fired, tr("unit(s) fired."));
+		UString message = format(tr("{0} unit(s) hired\n{1} unit(s) fired."), hired, fired);
 		if (transferred > 0)
 		{
-			message = format("%s\n(%d %s)", message, transferred, tr("units(s) transferred"));
+			message = format(tr("{0}\n({1} unit(s) transferred)"), message, transferred);
 		}
 		fw().stageQueueCommand(
 		    {StageCmd::Command::PUSH,

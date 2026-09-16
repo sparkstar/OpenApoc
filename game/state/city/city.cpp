@@ -6,8 +6,6 @@
 #include "game/state/city/building.h"
 #include "game/state/city/scenery.h"
 #include "game/state/city/vehicle.h"
-#include "game/state/city/vehiclemission.h"
-#include "game/state/city/vequipment.h"
 #include "game/state/gamestate.h"
 #include "game/state/rules/city/citycommonimagelist.h"
 #include "game/state/rules/city/scenerytiletype.h"
@@ -20,6 +18,7 @@
 #include "game/state/tilemap/tileobject_projectile.h"
 #include "game/state/tilemap/tileobject_scenery.h"
 #include "game/state/tilemap/tileobject_vehicle.h"
+#include <algorithm>
 #include <functional>
 #include <future>
 #include <glm/glm.hpp>
@@ -59,15 +58,10 @@ City::~City()
 	}
 	for (auto &b : this->buildings)
 	{
-		b.second->currentVehicles.clear();
-		b.second->currentAgents.clear();
-		b.second->city.clear();
-		b.second->base.clear();
-	}
-	for (auto &t : this->tile_types)
-	{
-		// Some damaged tile links can loop, causing a leak if they're not broken
-		t.second->damagedTile.clear();
+		b->currentVehicles.clear();
+		b->currentAgents.clear();
+		b->city.clear();
+		b->base.clear();
 	}
 }
 
@@ -101,7 +95,7 @@ void City::initCity(GameState &state)
 		{
 			if (s->building->carEntranceLocation.x != -1)
 			{
-				LogWarning("Building has multiple car entrances? %s", s->building->name);
+				LogWarning("Building has multiple car entrances? {0}", s->building->name);
 			}
 			s->building->carEntranceLocation = s->initialPosition;
 			// crew quarters is the closest to camera spot with vehicle access
@@ -120,33 +114,33 @@ void City::initCity(GameState &state)
 	int subtotalIncome = 0;
 	for (auto &b : this->buildings)
 	{
-		if (b.second->landingPadLocations.empty())
+		if (b->landingPadLocations.empty())
 		{
-			LogError("Building %s has no landing pads", b.first);
+			LogError("Building {0} has no landing pads", b.id);
 		}
-		LogInfo("Building %s has %u landing pads:", b.first,
-		        (unsigned)b.second->landingPadLocations.size());
-		for (auto &loc : b.second->landingPadLocations)
+		LogInfo("Building {0} has {1} landing pads:", b.id,
+		        (unsigned)b->landingPadLocations.size());
+		for (auto &loc : b->landingPadLocations)
 		{
-			LogInfo("Pad: %s", loc);
+			LogInfo("Pad: {0}", loc);
 		}
-		LogInfo("Car: %s", b.second->carEntranceLocation);
-		if (b.second->crewQuarters == Vec3<int>{-1, -1, -1})
+		LogInfo("Car: {0}", b->carEntranceLocation);
+		if (b->crewQuarters == Vec3<int>{-1, -1, -1})
 		{
-			LogWarning("Building %s has no car exit?", b.first);
-			b.second->crewQuarters = {(b.second->bounds.p0.x + b.second->bounds.p1.x) / 2,
-			                          (b.second->bounds.p0.y + b.second->bounds.p1.y) / 2, 2};
+			LogWarning("Building {0} has no car exit?", b.id);
+			b->crewQuarters = {(b->bounds.p0.x + b->bounds.p1.x) / 2,
+			                   (b->bounds.p0.y + b->bounds.p1.y) / 2, 2};
 		}
-		LogInfo("Crew Quarters: %s", b.second->crewQuarters);
-		if (b.second->function.id == "BUILDINGFUNCTION_SPACE_PORT")
+		LogInfo("Crew Quarters: {0}", b->crewQuarters);
+		if (b->function.id == "BUILDINGFUNCTION_SPACE_PORT")
 		{
-			spaceports.emplace_back(&state, b.first);
+			spaceports.emplace_back(&state, b.id);
 		}
-		b.second->owner->buildings.emplace_back(&state, b.first);
+		b->owner->buildings.emplace_back(&state, b.id);
 
-		populationWorking += b.second->currentWorkforce;
-		populationUnemployed += b.second->maximumWorkforce - b.second->currentWorkforce;
-		subtotalIncome += b.second->currentWage;
+		populationWorking += b->currentWorkforce;
+		populationUnemployed += b->maximumWorkforce - b->currentWorkforce;
+		subtotalIncome += b->currentWage;
 	}
 	averageWage = (populationWorking) ? subtotalIncome / populationWorking : 0;
 	populationUnemployed += 500; // original adjustment
@@ -320,14 +314,46 @@ void City::dailyLoop(GameState &state)
 		// check if employment situation changes in the building
 		for (auto &b : buildings)
 		{
-			b.second->updateWorkforce();
+			b->updateWorkforce();
 		}
 	}
-	generatePortals(state);
+}
+
+void City::weeklyLoop(GameState &state) { generatePortals(state); }
+
+bool City::canPlacePortal(Vec3<float> position)
+{
+	if (!(map->tileIsValid(position) && map->getTile(position)->ownedObjects.empty()))
+	{
+		return false;
+	}
+
+	for (int i = 1; i < 5; i++)
+	{
+		for (int x = -1; x <= 1; x++)
+		{
+			for (int y = -1; y <= 1; y++)
+			{
+				for (int z = -2; z <= 2; z++)
+				{
+					const auto newTile = position + Vec3<float>(x * i, y * i, z);
+
+					if (!(map->tileIsValid(newTile) && map->getTile(newTile)->ownedObjects.empty()))
+					{
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return true;
 }
 
 void City::generatePortals(GameState &state)
 {
+	const static auto zWeight = {1, 1, 3, 4, 6};
+	const static double portalDev = 25.0;
+
 	if (portals.empty())
 	{
 		if (!initial_portals.empty())
@@ -345,12 +371,8 @@ void City::generatePortals(GameState &state)
 		}
 		else
 		{
-			// FIXME: Implement proper portals
-			// According to skin36, portals must have empty 4x4x4 around them
-			// and spawn within 100x100 around city center
-
 			// FIXME: Implement portals in alien city staying where they are
-			// and starting where they should
+			// and starting where they should (Need to be linked to portals in human city)
 
 			static const int iterLimit = 1000;
 			for (auto &p : portals)
@@ -359,15 +381,17 @@ void City::generatePortals(GameState &state)
 			}
 			this->portals.clear();
 
-			std::uniform_int_distribution<int> xyPos(20, 120);
-			std::uniform_int_distribution<int> zPos(2, 8);
+			std::normal_distribution<double> xyPos(70.0, portalDev);
+			std::discrete_distribution<int> zPos(zWeight.begin(), zWeight.end());
+
 			for (int p = 0; p < 3; p++)
 			{
 				for (int i = 0; i < iterLimit; i++)
 				{
-					Vec3<float> pos(xyPos(state.rng), xyPos(state.rng), zPos(state.rng));
-
-					if (map->tileIsValid(pos) && map->getTile(pos)->ownedObjects.empty())
+					Vec3<float> pos(std::clamp(static_cast<int>(xyPos(state.rng)), 20, 120),
+					                std::clamp(static_cast<int>(xyPos(state.rng)), 20, 120),
+					                zPos(state.rng) + 4);
+					if (canPlacePortal(pos))
 					{
 						auto doodad =
 						    mksp<Doodad>(pos + Vec3<float>{0.5f, 0.5f, 0.5f},
@@ -383,9 +407,63 @@ void City::generatePortals(GameState &state)
 	}
 	else
 	{
-		// FIXME: Implement moving portals
-		// According to skin36, portal is moved by +-(2*week + 15) on each coordinate
-		// and must stay within -5..105 which means within 15 from map border in our coords
+		if (this->id == "CITYMAP_HUMAN")
+		{
+			curPortalPosList.clear();
+
+			static const int iterLimit = 1000;
+			for (auto &p : portals)
+			{
+				curPortalPosList.push_back(p->position);
+				p->remove(state);
+			}
+			this->portals.clear();
+
+			int week = state.gameTime.getWeek();
+			int offset = (2 * week) + 15;
+			std::uniform_int_distribution<int> newxyOffset(-offset, offset);
+			std::discrete_distribution<int> newzPos(zWeight.begin(), zWeight.end());
+
+			for (int p = 0; p < 3; p++)
+			{
+				bool portalPlaced = false;
+				for (int i = 0; i < iterLimit; i++)
+				{
+					Vec3<float> newPos(std::clamp(newxyOffset(state.rng) +
+					                                  static_cast<int>(curPortalPosList.back().x),
+					                              20, 120),
+					                   std::clamp(newxyOffset(state.rng) +
+					                                  static_cast<int>(curPortalPosList.back().y),
+					                              20, 120),
+					                   newzPos(state.rng) + 4);
+
+					if (canPlacePortal(newPos))
+					{
+						auto doodad =
+						    mksp<Doodad>(newPos + Vec3<float>{0.5f, 0.5f, 0.5f},
+						                 StateRef<DoodadType>{&state, "DOODAD_6_DIMENSION_GATE"});
+						doodad->voxelMap = state.city_common_image_list->portalVoxelMap;
+						map->addObjectToMap(doodad);
+						this->portals.push_back(doodad);
+						curPortalPosList.pop_back();
+						portalPlaced = true;
+						break;
+					}
+				}
+				if (!portalPlaced)
+				{
+					auto currentPos = curPortalPosList.back();
+					auto doodad =
+					    mksp<Doodad>(currentPos + Vec3<float>{0.5f, 0.5f, 0.5f},
+					                 StateRef<DoodadType>{&state, "DOODAD_6_DIMENSION_GATE"});
+					doodad->voxelMap = state.city_common_image_list->portalVoxelMap;
+					map->addObjectToMap(doodad);
+					this->portals.push_back(doodad);
+					curPortalPosList.pop_back();
+					// break;
+				}
+			}
+		}
 	}
 }
 
@@ -393,7 +471,7 @@ void City::updateInfiltration(GameState &state)
 {
 	for (auto &b : buildings)
 	{
-		b.second->alienGrowth(state);
+		b->alienGrowth(state);
 	}
 }
 
@@ -596,11 +674,11 @@ void City::repairVehicles(GameState &state [[maybe_unused]])
 	for (auto &b : buildings)
 	{
 		// Players get repaired according to facilities
-		if (b.second->base)
+		if (b->base)
 		{
-			int repairPoints = b.second->base->getCapacityTotal(FacilityType::Capacity::Repair);
+			int repairPoints = b->base->getCapacityTotal(FacilityType::Capacity::Repair);
 			std::list<StateRef<Vehicle>> vehiclesToRepair;
-			for (auto &v : b.second->currentVehicles)
+			for (auto &v : b->currentVehicles)
 			{
 				if (v->homeBuilding == v->currentBuilding && v->getHealth() < v->getMaxHealth())
 				{
@@ -633,7 +711,7 @@ void City::repairVehicles(GameState &state [[maybe_unused]])
 		// Corps get repaired by 12 flat
 		else
 		{
-			for (auto &v : b.second->currentVehicles)
+			for (auto &v : b->currentVehicles)
 			{
 				if (v->homeBuilding == v->currentBuilding)
 				{
@@ -712,7 +790,7 @@ void City::initialSceneryLinkUp()
 		if (mp->willCollapse())
 		{
 			auto pos = mp->tileObject->getOwningTile()->position;
-			LogWarning("SC %s at %s is UNLINKED", mp->type.id, pos);
+			LogWarning("SC {0} at {1} is UNLINKED", mp->type.id, pos);
 		}
 	}
 
@@ -740,7 +818,7 @@ void City::initialSceneryLinkUp()
 		if (mp->willCollapse())
 		{
 			auto pos = mp->tileObject->getOwningTile()->position;
-			LogWarning("SC %s at %s is going to fall", mp->type.id, pos);
+			LogWarning("SC {0} at {1} is going to fall", mp->type.id, pos);
 		}
 	}
 
@@ -761,7 +839,7 @@ sp<Vehicle> City::createVehicle(GameState &state, StateRef<VehicleType> type,
 {
 	auto v = mksp<Vehicle>();
 	v->type = type;
-	v->name = format("%s %d", type->name, ++type->numCreated);
+	v->name = format("{0} {1}", type->name, ++type->numCreated);
 	v->city = {&state, id};
 	v->owner = owner;
 	v->health = type->health;
@@ -829,7 +907,7 @@ template <> sp<City> StateObject<City>::get(const GameState &state, const UStrin
 	auto it = state.cities.find(id);
 	if (it == state.cities.end())
 	{
-		LogError("No citymap matching ID \"%s\"", id);
+		LogError("No citymap matching ID \"{0}\"", id);
 		return nullptr;
 	}
 	return it->second;
@@ -856,7 +934,7 @@ template <> const UString &StateObject<City>::getId(const GameState &state, cons
 			return c.first;
 		}
 	}
-	LogError("No city matching pointer %p", static_cast<void *>(ptr.get()));
+	LogError("No city matching pointer {0:p}", static_cast<void *>(ptr.get()));
 	return emptyString;
 }
 

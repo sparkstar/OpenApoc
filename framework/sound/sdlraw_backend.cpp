@@ -70,7 +70,7 @@ static bool ConvertAudio(AudioFormat input_format, SDL_AudioSpec &output_spec, i
 		size_t neededSize = std::max(1, cvt.len_mult) * cvt.len;
 		if (samples.size() < neededSize)
 		{
-			LogInfo("Expanding sample output buffer from %zu to %zu bytes", samples.size(),
+			LogInfo("Expanding sample output buffer from {0} to {1} bytes", samples.size(),
 			        neededSize);
 			samples.resize(neededSize);
 		}
@@ -127,6 +127,8 @@ class SDLRawBackend : public SoundBackend
 	std::shared_future<void> get_music_future;
 
 	unsigned int music_queue_size;
+
+	bool valid = false;
 
 	void getMoreMusic()
 	{
@@ -264,27 +266,35 @@ class SDLRawBackend : public SoundBackend
 		}
 	}
 
+	bool isValid() const { return valid; }
+
 	SDLRawBackend(int concurrent_sample_count)
 	    : SoundBackend(concurrent_sample_count), overall_volume(1.0f), music_volume(1.0f),
 	      sound_volume(1.0f), music_playing(false), music_callback_data(nullptr),
 	      music_queue_size(2)
 	{
-		SDL_Init(SDL_INIT_AUDIO);
 		preferred_format.channels = 2;
 		preferred_format.format = AudioFormat::SampleFormat::PCM_SINT16;
 		preferred_format.frequency = 22050;
-		LogInfo("Current audio driver: %s", SDL_GetCurrentAudioDriver());
+		LogInfo("Current audio driver: {0}", SDL_GetCurrentAudioDriver());
 		LogWarning("Changing audio drivers is not currently implemented!");
 		int numDevices = SDL_GetNumAudioDevices(0); // Request playback devices only
-		LogInfo("Number of audio devices: %d", numDevices);
+
+		LogInfo("Number of audio devices: {0}", numDevices);
+		if (numDevices < 1)
+		{
+			LogWarning("No audio devices found!");
+			valid = false;
+			return;
+		}
 		for (int i = 0; i < numDevices; ++i)
 		{
-			LogInfo("Device %d: %s", i, SDL_GetAudioDeviceName(i, 0));
+			LogInfo("Device {0}: {1}", i, SDL_GetAudioDeviceName(i, 0));
 		}
 		LogWarning(
 		    "Selecting audio devices not currently implemented! Selecting first available device.");
 		const char *deviceName = SDL_GetAudioDeviceName(0, 0);
-		LogInfo("Using audio device: %s", deviceName);
+		LogInfo("Using audio device: {0}", deviceName);
 		SDL_AudioSpec wantFormat;
 		wantFormat.channels = 2;
 		wantFormat.format = AUDIO_S16LSB;
@@ -298,15 +308,22 @@ class SDLRawBackend : public SoundBackend
 		    0,       // capturing is not supported
 		    &wantFormat, &output_spec,
 		    SDL_AUDIO_ALLOW_ANY_CHANGE); // hopefully we'll get a sane output format
-		SDL_PauseAudioDevice(devID, 0);  // Run at once?
+		if (devID == 0)
+		{
+			LogWarning("Failed to open audio device: {0}", SDL_GetError());
+			valid = false;
+			return;
+		}
+		SDL_PauseAudioDevice(devID, 0); // Run at once?
 
-		LogWarning("Audio output format: Channels %d, format: %s %s %s %dbit, freq %d, samples %d",
-		           (int)output_spec.channels,
-		           SDL_AUDIO_ISSIGNED(output_spec.format) ? "signed" : "unsigned",
-		           SDL_AUDIO_ISFLOAT(output_spec.format) ? "float" : "int",
-		           SDL_AUDIO_ISBIGENDIAN(output_spec.format) ? "BE" : "LE",
-		           SDL_AUDIO_BITSIZE(output_spec.format), (int)output_spec.freq,
-		           (int)output_spec.samples);
+		LogWarning(
+		    "Audio output format: Channels {0}, format: {1} {2} {3} {4}bit, freq {5}, samples {6}",
+		    (int)output_spec.channels,
+		    SDL_AUDIO_ISSIGNED(output_spec.format) ? "signed" : "unsigned",
+		    SDL_AUDIO_ISFLOAT(output_spec.format) ? "float" : "int",
+		    SDL_AUDIO_ISBIGENDIAN(output_spec.format) ? "BE" : "LE",
+		    SDL_AUDIO_BITSIZE(output_spec.format), (int)output_spec.freq, (int)output_spec.samples);
+		valid = true;
 	}
 	void playSample(sp<Sample> sample, float gain) override
 	{
@@ -320,13 +337,13 @@ class SDLRawBackend : public SoundBackend
 			std::lock_guard<std::recursive_mutex> l(this->audio_lock);
 			if (this->live_samples.size() > this->concurrent_samples)
 			{
-				LogInfo("Skipping sound %s as we already have %d on queue", sample->path,
+				LogInfo("Skipping sound {0} as we already have {1} on queue", sample->path,
 				        this->live_samples.size());
 				return;
 			}
 			this->live_samples.emplace_back(sample, gain);
 		}
-		LogInfo("Placed sound %s on queue", sample->path);
+		LogInfo("Placed sound {0} on queue", sample->path);
 	}
 
 	void playMusic(std::function<void(void *)> finishedCallback, void *callbackData) override
@@ -345,7 +362,7 @@ class SDLRawBackend : public SoundBackend
 	void setTrack(sp<MusicTrack> track) override
 	{
 		std::lock_guard<std::recursive_mutex> l(this->audio_lock);
-		LogInfo("Setting track to %s", track->path);
+		LogInfo("Setting track to {0}", track->path);
 		this->track = track;
 		while (!music_queue.empty())
 			music_queue.pop();
@@ -432,12 +449,18 @@ class SDLRawBackendFactory : public SoundBackendFactory
 		int ret = SDL_InitSubSystem(SDL_INIT_AUDIO);
 		if (ret < 0)
 		{
-			LogWarning("Failed to init SDL_AUDIO (%d) - %s", ret, SDL_GetError());
+			LogWarning("Failed to init SDL_AUDIO ({0}) - {1}", ret, SDL_GetError());
 			return nullptr;
 		}
 		// We do sw mixing so can support "any" concurrent sample count (though realistically
 		// limited by cpu performance)
-		return new SDLRawBackend(concurrent_sample_count);
+		auto *backend = new SDLRawBackend(concurrent_sample_count);
+		if (backend->isValid())
+		{
+			return backend;
+		}
+		delete backend;
+		return nullptr;
 	}
 
 	~SDLRawBackendFactory() override = default;

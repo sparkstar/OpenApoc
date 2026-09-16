@@ -22,7 +22,6 @@
 #include "game/state/city/city.h"
 #include "game/state/city/vehicle.h"
 #include "game/state/gamestate.h"
-#include "game/state/rules/battle/damage.h"
 #include "game/state/shared/aequipment.h"
 #include "game/state/shared/agent.h"
 #include "game/state/tilemap/tileobject_battleunit.h"
@@ -32,6 +31,7 @@
 #include "game/ui/general/aequipmentsheet.h"
 #include "game/ui/general/agentsheet.h"
 #include "game/ui/general/messagebox.h"
+#include <boost/algorithm/string/join.hpp>
 
 namespace OpenApoc
 {
@@ -57,12 +57,13 @@ AEquipScreen::AEquipScreen(sp<GameState> state, sp<Agent> firstAgent)
 	    paperDollPlaceholder->Location, paperDollPlaceholder->Size, EQUIP_GRID_SLOT_SIZE);
 
 	inventoryControl = formMain->findControlTyped<Graphic>("INVENTORY");
+	inventoryScrollBar = formMain->findControlTyped<ScrollBar>("INVENTORY_SCROLLBAR");
 
 	for (int i = 12; i <= 18; i++)
 	{
 		bigUnitRanks.push_back(
 		    fw().data->loadImage(format("PCK:xcom3/tacdata/tacbut.pck:xcom3/tacdata/"
-		                                "tacbut.tab:%d:xcom3/tacdata/tactical.pal",
+		                                "tacbut.tab:{0}:xcom3/tacdata/tactical.pal",
 		                                i)));
 	}
 
@@ -138,7 +139,7 @@ AEquipScreen::AEquipScreen(sp<GameState> state, sp<Agent> firstAgent)
 	        });
 
 	woundImage = fw().data->loadImage(format("PCK:xcom3/tacdata/icons.pck:xcom3/tacdata/"
-	                                         "icons.tab:%d:xcom3/tacdata/tactical.pal",
+	                                         "icons.tab:{0}:xcom3/tacdata/tactical.pal",
 	                                         258));
 	FATAL_WOUND_LOCATIONS[BodyPart::Helmet] = {{310, 130}, {307, 117}, {327, 137},
 	                                           {312, 128}, {309, 118}, {317, 123}};
@@ -313,16 +314,23 @@ void AEquipScreen::eventOccurred(Event *e)
 			attemptCloseScreen();
 			return;
 		}
-		if (e->forms().RaisedBy->Name == "BUTTON_LEFT")
+	}
+
+	if (e->type() == EVENT_MOUSE_SCROLL && inventoryScrollBar->isVisible())
+	{
+		Vec2<int> mousePos{e->mouse().X, e->mouse().Y};
+		Vec2<int> inventoryPos = inventoryControl->Location + formMain->Location;
+		if (Rect<int>{inventoryPos, inventoryPos + inventoryControl->Size}.within(mousePos))
 		{
-			inventoryPage--;
-			clampInventoryPage();
-			return;
-		}
-		if (e->forms().RaisedBy->Name == "BUTTON_RIGHT")
-		{
-			inventoryPage++;
-			clampInventoryPage();
+			int wheelDelta = e->mouse().WheelVertical + e->mouse().WheelHorizontal;
+			if (wheelDelta > 0)
+			{
+				inventoryScrollBar->scrollPrev();
+			}
+			else if (wheelDelta < 0)
+			{
+				inventoryScrollBar->scrollNext();
+			}
 			return;
 		}
 	}
@@ -394,7 +402,7 @@ void AEquipScreen::eventOccurred(Event *e)
 
 		// Check if we're over any equipment in the list at the bottom
 		auto posWithinInventory = mousePos;
-		posWithinInventory.x += inventoryPage * inventoryControl->Size.x;
+		posWithinInventory.x += inventoryScrollBar->getValue();
 		for (auto &tuple : this->inventoryItems)
 		{
 			if (std::get<0>(tuple).within(posWithinInventory))
@@ -403,10 +411,10 @@ void AEquipScreen::eventOccurred(Event *e)
 				// Ensure this item is on screen
 				auto rect = std::get<0>(tuple);
 				auto pos = rect.p0;
-				pos.x -= inventoryPage * inventoryControl->Size.x;
+				pos.x -= inventoryScrollBar->getValue();
 				if (pos.x < inventoryControl->Location.x + formMain->Location.x ||
-				    pos.x >= inventoryControl->Location.x + inventoryControl->Size.x +
-				                 formMain->Location.x)
+				    pos.x + rect.getWidth() > inventoryControl->Location.x +
+				                                  inventoryControl->Size.x + formMain->Location.x)
 				{
 					break;
 				}
@@ -486,12 +494,13 @@ void AEquipScreen::render()
 		auto count = std::get<1>(tuple);
 		auto rect = std::get<0>(tuple);
 		auto pos = rect.p0;
-		pos.x -= inventoryPage * inventoryControl->Size.x;
-		auto countImage = count > 0 ? labelFont->getString(format("%d", count)) : nullptr;
+		pos.x -= inventoryScrollBar->getValue();
+		auto countImage = count > 0 ? labelFont->getString(format("{0}", count)) : nullptr;
 		auto &equipmentImage = item->type->equipscreen_sprite;
 
 		if (pos.x < inventoryControl->Location.x + formMain->Location.x ||
-		    pos.x >= inventoryControl->Location.x + inventoryControl->Size.x + formMain->Location.x)
+		    pos.x + rect.getWidth() >
+		        inventoryControl->Location.x + inventoryControl->Size.x + formMain->Location.x)
 		{
 			continue;
 		}
@@ -581,8 +590,11 @@ void AEquipScreen::handleItemPickup(Vec2<int> mousePos)
 	{
 		// Check if we're over any equipment in the list at the bottom
 		auto posWithinInventory = mousePos;
-		posWithinInventory.x += inventoryPage * inventoryControl->Size.x;
-		if (tryPickUpItem(posWithinInventory, &alienArtifact))
+		posWithinInventory.x += inventoryScrollBar->getValue();
+
+		const auto tryPickUpItemResult = tryPickUpItem(posWithinInventory, &alienArtifact);
+
+		if (tryPickUpItemResult.second)
 		{
 			refreshInventoryItems();
 
@@ -595,10 +607,37 @@ void AEquipScreen::handleItemPickup(Vec2<int> mousePos)
 		}
 		else if (alienArtifact)
 		{
+			const auto &itemType = tryPickUpItemResult.first->type;
+
+			auto message = tr("You must research Alien technology before you can use it.");
+
+			if (itemType->type == AEquipmentType::Type::Weapon)
+			{
+				std::vector<UString> ammoTypeNameList = {};
+
+				for (const auto &ammoType : itemType->ammo_types)
+				{
+					ammoTypeNameList.push_back(ammoType->name);
+				}
+
+				if (ammoTypeNameList.size() == 1)
+				{
+					message = format(
+					    "{0}: {1}.",
+					    tr("You must research this weapon and its ammo before you can use it"),
+					    ammoTypeNameList[0]);
+				}
+				else if (ammoTypeNameList.size() > 1)
+				{
+					message = format("{0}: {1}.",
+					                 tr("You must research this weapon and all its ammo types "
+					                    "before you can use it"),
+					                 boost::algorithm::join(ammoTypeNameList, ", "));
+				}
+			}
+
 			auto message_box =
-			    mksp<MessageBox>(tr("Alien Artifact"),
-			                     tr("You must research Alien technology before you can use it."),
-			                     MessageBox::ButtonOptions::Ok);
+			    mksp<MessageBox>(tr("Alien Artifact"), message, MessageBox::ButtonOptions::Ok);
 			fw().stageQueueCommand({StageCmd::Command::PUSH, message_box});
 		}
 	}
@@ -638,7 +677,7 @@ void AEquipScreen::handleItemPlacement(Vec2<int> mousePos)
 	{
 		auto message_box = mksp<MessageBox>(
 		    tr("NOT ENOUGH TU'S"),
-		    format("%s %d", tr("TU cost per item picked up:"), currentAgent->unit->getPickupCost()),
+		    format(tr("TU cost per item picked up: {0}"), currentAgent->unit->getPickupCost()),
 		    MessageBox::ButtonOptions::Ok);
 		fw().stageQueueCommand({StageCmd::Command::PUSH, message_box});
 	}
@@ -708,7 +747,7 @@ void AEquipScreen::handleItemPlacement(bool toAgent)
 	{
 		auto message_box = mksp<MessageBox>(
 		    tr("NOT ENOUGH TU'S"),
-		    format("%s %d", tr("TU cost per item picked up:"), currentAgent->unit->getPickupCost()),
+		    format(tr("TU cost per item picked up: {0}"), currentAgent->unit->getPickupCost()),
 		    MessageBox::ButtonOptions::Ok);
 		fw().stageQueueCommand({StageCmd::Command::PUSH, message_box});
 	}
@@ -824,7 +863,8 @@ void AEquipScreen::selectAgent(sp<Agent> agent, bool inverse, bool additive)
 
 void AEquipScreen::displayItem(sp<AEquipment> item)
 {
-	bool researched = item->type->canBeUsed(*state, state->getPlayer());
+	const bool researched = item->type->isResearched();
+
 	AEquipmentSheet(formAgentItem).display(item, researched);
 	formAgentItem->setVisible(true);
 	formAgentStats->setVisible(false);
@@ -908,7 +948,7 @@ void AEquipScreen::refreshInventoryItems()
 		formMain->findControlTyped<RadioButton>("BUTTON_SHOW_ARMOUR")->setVisible(false);
 	}
 
-	clampInventoryPage();
+	updateInventoryScrollRange();
 }
 
 void AEquipScreen::populateInventoryItemsBattle()
@@ -1124,7 +1164,7 @@ void AEquipScreen::removeItemFromInventoryBattle(sp<AEquipment> item)
 		LogError("No battle item object in battle inventory?");
 		return;
 	}
-	battleItem->die(*state, false);
+	battleItem->die(*state, false, false);
 }
 
 void AEquipScreen::removeItemFromInventoryBase(sp<AEquipment> item)
@@ -1318,29 +1358,35 @@ bool AEquipScreen::tryPickUpItem(sp<Agent> agent, Vec2<int> slotPos, bool altern
 	return true;
 }
 
-bool AEquipScreen::tryPickUpItem(Vec2<int> inventoryPos, bool *alienArtifact)
+std::pair<sp<AEquipment>, bool> AEquipScreen::tryPickUpItem(Vec2<int> inventoryPos,
+                                                            bool *alienArtifact)
 {
-	for (auto &tuple : inventoryItems)
+	for (const auto &tuple : inventoryItems)
 	{
-		auto rect = std::get<0>(tuple);
-		if (rect.within(inventoryPos))
+		auto &rect = std::get<0>(tuple);
+
+		if (!rect.within(inventoryPos))
+			continue;
+
+		const auto &item = std::get<2>(tuple);
+
+		if (!item->type->canBeUsed(*state, state->getPlayer()) && getMode() != Mode::Battle)
 		{
-			if (!std::get<2>(tuple)->type->canBeUsed(*state, state->getPlayer()) &&
-			    getMode() != Mode::Battle)
+			if (alienArtifact)
 			{
-				if (alienArtifact)
-				{
-					*alienArtifact = true;
-				}
-				return false;
+				*alienArtifact = true;
 			}
 
-			pickUpItem(std::get<2>(tuple));
-			draggedEquipmentOffset = rect.p0 - inventoryPos;
-			return true;
+			return {item, false};
 		}
+
+		pickUpItem(item);
+		draggedEquipmentOffset = rect.p0 - inventoryPos;
+
+		return {item, true};
 	}
-	return false;
+
+	return {nullptr, false};
 }
 
 bool AEquipScreen::tryPickUpItem(const AEquipmentType &item)
@@ -1630,7 +1676,7 @@ void AEquipScreen::processTemplate(int idx, bool remember)
 				}
 				else
 				{
-					LogError("Agent %s cannot apply template, fail at pos %s item %s",
+					LogError("Agent {0} cannot apply template, fail at pos {1} item {2}",
 					         currentAgent->name, pos, type.id);
 				}
 			}
@@ -1758,9 +1804,9 @@ void AEquipScreen::closeScreen()
 				Vec2<int> pos = {entry.first.x, entry.first.y};
 				for (auto &b : dropperAgent->city->buildings)
 				{
-					if (b.second->bounds.within(pos))
+					if (b->bounds.within(pos))
 					{
-						buildingToDropTo = {state.get(), b.first};
+						buildingToDropTo = {state.get(), b.id};
 						break;
 					}
 				}
@@ -2112,26 +2158,18 @@ void AEquipScreen::updateFirstAgent()
 	refreshInventoryItems();
 }
 
-void AEquipScreen::clampInventoryPage()
+void AEquipScreen::updateInventoryScrollRange()
 {
-	if (inventoryPage < 0)
+	int inventoryLeft = inventoryControl->Location.x + formMain->Location.x;
+	int contentRight = inventoryLeft;
+	for (auto &item : inventoryItems)
 	{
-		inventoryPage = 0;
+		contentRight = std::max(contentRight, std::get<0>(item).p1.x);
 	}
-	if (inventoryPage > 0)
-	{
-		int inventoryLeft = inventoryControl->Location.x + formMain->Location.x;
-		int maxPageSeen = 0;
-		for (auto &item : inventoryItems)
-		{
-			auto rect = std::get<0>(item);
-			maxPageSeen = (rect.p0.x - inventoryLeft) / inventoryControl->Size.x;
-		}
-		if (inventoryPage > maxPageSeen)
-		{
-			inventoryPage = maxPageSeen;
-		}
-	}
+	int maxScroll = std::max(0, contentRight - inventoryLeft - inventoryControl->Size.x);
+	inventoryScrollBar->setMinimum(0);
+	inventoryScrollBar->setMaximum(maxScroll);
+	inventoryScrollBar->setVisible(maxScroll > 0);
 }
 
 bool AEquipScreen::isTurnBased() const

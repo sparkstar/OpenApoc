@@ -6,7 +6,6 @@
 #include "game/state/rules/doodadtype.h"
 #include "game/state/tilemap/tilemap.h"
 #include "game/state/tilemap/tileobject_doodad.h"
-#include <algorithm>
 
 namespace OpenApoc
 {
@@ -73,7 +72,7 @@ sp<Image> Doodad::getSprite()
 		if (animTime > age)
 			return frame;
 	}
-	LogWarning("Doodad reached age %d with no frame", age);
+	LogWarning("Doodad reached age {0} with no frame", age);
 	return frame;
 }
 

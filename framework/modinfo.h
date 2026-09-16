@@ -1,6 +1,9 @@
 #pragma once
 
 #include "library/strings.h"
+
+#include <list>
+#include <map>
 #include <optional>
 
 namespace OpenApoc
@@ -19,8 +22,18 @@ class ModInfo
 	UString dataPath;
 	UString statePath;
 	UString minVersion;
-	UString modLoadScript;
-	std::list<UString> supported_languages;
+	std::map<int, UString> difficultySubmods;
+
+  public:
+	struct ModLanguage
+	{
+		UString ID;
+		UString data;
+		UString patch;
+	};
+
+  private:
+	std::list<ModLanguage> supported_languages;
 
   public:
 	// The user-visible name of the mod
@@ -70,13 +83,23 @@ class ModInfo
 	static std::optional<ModInfo> getInfo(const UString &path);
 	bool writeInfo(const UString &path);
 
-	const UString &getModLoadScript() const { return modLoadScript; }
-	void setModLoadScript(const UString &newScript) { modLoadScript = newScript; }
+	// A map of difficulty level -> gamestate-patch path (physfs-relative, looked up via
+	// fw().data->fs.resolvePath and loaded via GameState::appendGameState). The entry
+	// matching the chosen difficulty (if any) is applied after the mod's base gamestate
+	// and language patch.
+	const std::map<int, UString> &getDifficultySubmods() const { return difficultySubmods; }
+	void setDifficultySubmods(std::map<int, UString> newMap)
+	{
+		difficultySubmods = std::move(newMap);
+	}
 
-	const std::list<UString> getSupportedLanguages() const { return supported_languages; }
-	void setSupportedLanguage(const std::list<UString> &newLanguages)
+	const std::list<ModLanguage> getSupportedLanguages() const { return supported_languages; }
+	void setSupportedLanguages(const std::list<ModLanguage> &newLanguages)
 	{
 		supported_languages = newLanguages;
 	}
 };
+
+// Returns a ModLanguage most applicable to the current locale
+std::optional<ModInfo::ModLanguage> getModLanguageInfo(const ModInfo &modInfo);
 } // namespace OpenApoc

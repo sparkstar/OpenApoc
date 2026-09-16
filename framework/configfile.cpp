@@ -5,7 +5,6 @@
 #include "framework/configfile.h"
 #include "framework/filesystem.h"
 #include "framework/logger.h"
-#include "framework/options.h"
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -19,6 +18,11 @@ namespace po = boost::program_options;
 
 namespace OpenApoc
 {
+
+// validate overload required by boost::program_options for UString
+// boost should find this through ADL.
+// this is required for string values with spaces
+void validate(boost::any &v, const std::vector<std::string> &values, UString *, int);
 
 static ConfigFile *configInstance = nullptr;
 
@@ -144,7 +148,7 @@ class ConfigFileImpl
 			auto unknown_options = po::collect_unrecognized(parsed.options, po::include_positional);
 			for (const auto &unknown : unknown_options)
 			{
-				LogWarning("Ignoring option \"%s\"", unknown);
+				LogWarning("Ignoring option \"{0}\"", unknown);
 			}
 		}
 		catch (po::error &err)
@@ -216,7 +220,7 @@ class ConfigFileImpl
 			auto splitString = split(optionPair.first, ".");
 			if (splitString.size() < 1)
 			{
-				LogError("Invalid option string \"%s\"", optionPair.first);
+				LogError("Invalid option string \"{0}\"", optionPair.first);
 				continue;
 			}
 			UString sectionName;
@@ -229,7 +233,7 @@ class ConfigFileImpl
 
 			auto optionName = splitString[splitString.size() - 1];
 			UString configFileLine =
-			    format("%s=%s", optionName, std::visit(ToStringVisitor(), optionPair.second));
+			    format("{0}={1}", optionName, std::visit(ToStringVisitor(), optionPair.second));
 			configFileContents[sectionName].push_back(configFileLine);
 		}
 
@@ -288,7 +292,7 @@ class ConfigFileImpl
 		}
 		if (!this->get(key))
 		{
-			LogError("Option \"%s\" not set", key);
+			LogError("Option \"{0}\" not set", key);
 			throw std::exception();
 		}
 		auto it = this->modifiedOptions.find(key);

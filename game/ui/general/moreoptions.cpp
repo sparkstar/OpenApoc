@@ -4,8 +4,6 @@
 #include "forms/graphicbutton.h"
 #include "forms/label.h"
 #include "forms/listbox.h"
-#include "forms/scrollbar.h"
-#include "forms/textbutton.h"
 #include "forms/textedit.h"
 #include "forms/ui.h"
 #include "framework/configfile.h"
@@ -14,11 +12,8 @@
 #include "framework/framework.h"
 #include "framework/keycodes.h"
 #include "game/state/gamestate.h"
-#include "game/state/shared/organisation.h"
-#include <forms/graphic.h>
 #include <functional>
 #include <iomanip>
-#include <limits>
 #include <regex>
 #include <sstream>
 
@@ -50,13 +45,12 @@ static const std::list<std::pair<UString, UString>> cityscapeList = {
     {"OpenApoc.NewFeature", "ATVUFOMission"},
     {"OpenApoc.NewFeature", "ShowCurrentDimensionVehicles"},
     {"OpenApoc.NewFeature", "ShowNonXCOMVehiclesPrefix"},
+    {"OpenApoc.NewFeature", "IsoOnlyFollow"},
+    {"OpenApoc.NewFeature", "formatAsCurrency"},
     {"OpenApoc.Mod", "MaxTileRepair"},
     {"OpenApoc.Mod", "SceneryRepairCostFactor"},
     {"OpenApoc.Mod", "RaidHostileAction"},
-    {"OpenApoc.Mod", "CrashingVehicles"},
     {"OpenApoc.Mod", "InvulnerableRoads"},
-    {"OpenApoc.Mod", "ATVTank"},
-    {"OpenApoc.Mod", "ATVAPC"},
 };
 
 static const std::list<std::pair<UString, UString>> battlescapeList = {
@@ -64,10 +58,10 @@ static const std::list<std::pair<UString, UString>> battlescapeList = {
     {"OpenApoc.NewFeature", "UFODamageModel"},
     {"OpenApoc.NewFeature", "GravliftSounds"},
     {"OpenApoc.NewFeature", "NoInstantThrows"},
+    {"OpenApoc.NewFeature", "GravliftLineOfFire"},
     {"OpenApoc.NewFeature", "PayloadExplosion"},
     {"OpenApoc.NewFeature", "DisplayUnitPaths"},
     {"OpenApoc.NewFeature", "AllowForceFiringParallel"},
-    {"OpenApoc.NewFeature", "RequireLOSToMaintainPsi"},
     {"OpenApoc.NewFeature", "AlternateVehicleShieldSound"},
     {"OpenApoc.NewFeature", "RunAndKneel"},
     {"OpenApoc.NewFeature", "AutoReload"},
@@ -75,7 +69,6 @@ static const std::list<std::pair<UString, UString>> battlescapeList = {
     {"OpenApoc.NewFeature", "SingleSquadSelect"},
     {"OpenApoc.NewFeature", "LoadSameAmmo"},
     {"OpenApoc.Mod", "StunHostileAction"},
-    {"OpenApoc.Mod", "BSKLauncherSound"},
 };
 
 // TODO: Implement vanilla mode
@@ -427,7 +420,7 @@ sp<TextEdit> MoreOptions::createTextEditForNumericOptions(const UString &optionS
 	const auto optionFullName = getOptionFullName(optionSection, optionName);
 
 	// Create textEdit
-	const auto textEdit = mksp<TextEdit>(tr(config().describe(optionSection, optionName)), font);
+	const auto textEdit = mksp<TextEdit>(config().describe(optionSection, optionName), font);
 
 	textEdit->setText(labelText);
 
@@ -532,10 +525,10 @@ void MoreOptions::addChildLabelToControl(const sp<Control> &control, const UStri
                                          const int &labelLocationHeight)
 {
 	const auto chidlLabel =
-	    control->createChild<Label>(tr(config().describe(optionSection, optionName)), font);
+	    control->createChild<Label>(config().describe(optionSection, optionName), font);
 	chidlLabel->Size = {216, listControl->ItemSize};
 	chidlLabel->Location = {labelLocationHeight, 0};
-	chidlLabel->ToolTipText = tr(config().describe(optionSection, optionName));
+	chidlLabel->ToolTipText = config().describe(optionSection, optionName);
 	chidlLabel->ToolTipFont = font;
 }
 
@@ -568,9 +561,7 @@ void MoreOptions::begin()
 	menuform->findControlTyped<Label>("TEXT_FUNDS")->setText(state->getPlayerBalance());
 	loadLists();
 
-	// TODO: Implement vanilla mode
-	// menuform->findControlTyped<CheckBox>("VANILLA_TOGGLE")
-	//    ->setChecked(config().getBool("Options.Misc.VanillaToggle"));
+	// Left side
 	menuform->findControlTyped<CheckBox>("DEBUGVIS_TOGGLE")
 	    ->setChecked(config().getBool("OpenApoc.NewFeature.DebugCommandsVisible"));
 	menuform->findControlTyped<CheckBox>("SCROLLSOUND_TOGGLE")
@@ -583,6 +574,9 @@ void MoreOptions::begin()
 	    ->setChecked(config().getBool("OpenApoc.NewFeature.EnableAgentTemplates"));
 	menuform->findControlTyped<CheckBox>("SEEDRNG_TOGGLE")
 	    ->setChecked(config().getBool("OpenApoc.NewFeature.SeedRng"));
+	// Right side
+	menuform->findControlTyped<CheckBox>("MOUSEGRAB_TOGGLE")
+	    ->setChecked(config().getBool("Framework.MouseCapture"));
 }
 
 void MoreOptions::pause() {}
@@ -591,9 +585,6 @@ void MoreOptions::resume() {}
 
 void MoreOptions::finish()
 {
-	// TODO: Implement vanilla mode
-	// config().set("Options.Misc.VanillaToggle",
-	//             menuform->findControlTyped<CheckBox>("VANILLA_TOGGLE")->isChecked());
 	config().set("OpenApoc.NewFeature.DebugCommandsVisible",
 	             menuform->findControlTyped<CheckBox>("DEBUGVIS_TOGGLE")->isChecked());
 	config().set("OpenApoc.NewFeature.NoScrollSounds",
@@ -606,6 +597,9 @@ void MoreOptions::finish()
 	             menuform->findControlTyped<CheckBox>("TEMPLATES_TOGGLE")->isChecked());
 	config().set("OpenApoc.NewFeature.SeedRng",
 	             menuform->findControlTyped<CheckBox>("SEEDRNG_TOGGLE")->isChecked());
+	config().set("Framework.MouseCapture",
+	             menuform->findControlTyped<CheckBox>("MOUSEGRAB_TOGGLE")->isChecked());
+	fw().setMouseGrab();
 	saveLists();
 }
 

@@ -176,11 +176,28 @@ class AEquipmentType : public StateObject<AEquipmentType>
 	std::map<StateRef<AgentType>, int> spawnList;
 
 	bool canBeUsed(GameState &state, StateRef<Organisation> user) const;
+
+	/// <summary>
+	/// Get if type is researched.
+	///
+	/// By default it will search through dependency topics via topic name.
+	/// If no topic with same name is found, then method will call "research_dependency.satisfied()"
+	/// instead, which unfortunately considers not only topic research, but children research status
+	/// as well.
+	/// </summary>
+	/// <returns>Returns if type is already researched.</returns>
+	bool isResearched() const;
 };
 
 class EquipmentSet : public StateObject<EquipmentSet>
 {
   public:
+	// "Human" types are based on a "tech level" and "Alien" types are based on score.
+	enum class Type
+	{
+		Human,
+		Alien,
+	};
 	class WeaponData
 	{
 	  public:
@@ -222,6 +239,7 @@ class EquipmentSet : public StateObject<EquipmentSet>
 		}
 	};
 	UString id;
+	Type type = Type::Human;
 
 	int min_score = std::numeric_limits<int>::min();
 	int max_score = std::numeric_limits<int>::max();
@@ -233,8 +251,9 @@ class EquipmentSet : public StateObject<EquipmentSet>
 
 	std::list<const AEquipmentType *> generateEquipmentList(GameState &state);
 
-	static sp<EquipmentSet> getByScore(const GameState &state, const int score);
-	static sp<EquipmentSet> getByLevel(const GameState &state, const int level);
+	// Find the first EquipmentSet of the given type whose allowed range contains
+	// "score" (for "Alien" sets) or "tech level" (for Human sets).
+	static sp<EquipmentSet> getForType(const GameState &state, Type type, int score);
 };
 
 class EquipmentTemplate

@@ -1,12 +1,10 @@
 #pragma once
 
-#include "float.h"
 #include "game/state/battle/ai/aidecision.h"
 #include "game/state/gametime.h"
 #include "game/state/stateobject.h"
 #include "library/sp.h"
 #include "library/strings.h"
-#include "library/vec.h"
 #include <list>
 
 namespace OpenApoc
@@ -27,8 +25,8 @@ class TacticalAI
 	virtual ~TacticalAI() = default;
 	const UString getName();
 
-	virtual void reset(GameState &, StateRef<Organisation>){};
-	virtual void beginTurnRoutine(GameState &, StateRef<Organisation>){};
+	virtual void reset(GameState &, StateRef<Organisation>) {};
+	virtual void beginTurnRoutine(GameState &, StateRef<Organisation>) {};
 	virtual std::list<std::pair<std::list<StateRef<BattleUnit>>, AIDecision>>
 	think(GameState &, StateRef<Organisation>)
 	{

@@ -18,14 +18,20 @@ TileView::TileView(TileMap &map, Vec3<int> isoTileSize, Vec2<int> stratTileSize,
       selectedTilePosition(0, 0, 0), maxZDraw(map.size.z), centerPos(0, 0, 0),
       isoScrollSpeed(0.5, 0.5), stratScrollSpeed(2.0f, 2.0f)
 {
-	LogInfo("dpySize: %s", dpySize);
+	LogInfo("dpySize: {0}", dpySize);
 }
 
 TileView::~TileView() = default;
 
 void TileView::begin() { autoScroll = config().getBool("Options.Misc.AutoScroll"); }
 
-void TileView::pause() {}
+void TileView::pause()
+{
+	scrollUpKB = false;
+	scrollDownKB = false;
+	scrollLeftKB = false;
+	scrollRightKB = false;
+}
 
 void TileView::resume() { autoScroll = config().getBool("Options.Misc.AutoScroll"); }
 
@@ -39,7 +45,7 @@ void TileView::eventOccurred(Event *e)
 		{
 			case SDLK_F1:
 				debugHotkeyMode = !debugHotkeyMode;
-				LogWarning("DEBUG MODE %s", debugHotkeyMode);
+				LogWarning("DEBUG MODE {0}", debugHotkeyMode);
 				break;
 			case SDLK_UP:
 				scrollUpKB = true;
@@ -54,28 +60,74 @@ void TileView::eventOccurred(Event *e)
 				scrollRightKB = true;
 				break;
 			case SDLK_s:
-				if (selectedTilePosition.y < (map.size.y - 1))
-					selectedTilePosition.y++;
+				if (debugHotkeyMode)
+				{
+					if (selectedTilePosition.y < (map.size.y - 1))
+						this->setSelectedTilePosition({selectedTilePosition.x,
+						                               selectedTilePosition.y + 1,
+						                               selectedTilePosition.z});
+				}
+				else
+				{
+					scrollDownKB = true;
+				}
 				break;
 			case SDLK_w:
-				if (selectedTilePosition.y > 0)
-					selectedTilePosition.y--;
+				if (debugHotkeyMode)
+				{
+					if (selectedTilePosition.y > 0)
+						this->setSelectedTilePosition({selectedTilePosition.x,
+						                               selectedTilePosition.y - 1,
+						                               selectedTilePosition.z});
+				}
+				else
+				{
+					scrollUpKB = true;
+				}
 				break;
 			case SDLK_a:
-				if (selectedTilePosition.x > 0)
-					selectedTilePosition.x--;
+				if (debugHotkeyMode)
+				{
+					if (selectedTilePosition.x > 0)
+						this->setSelectedTilePosition({selectedTilePosition.x - 1,
+						                               selectedTilePosition.y,
+						                               selectedTilePosition.z});
+				}
+				else
+				{
+					scrollLeftKB = true;
+				}
 				break;
 			case SDLK_d:
-				if (selectedTilePosition.x < (map.size.x - 1))
-					selectedTilePosition.x++;
+				if (debugHotkeyMode)
+				{
+					if (selectedTilePosition.x < (map.size.x - 1))
+						this->setSelectedTilePosition({selectedTilePosition.x + 1,
+						                               selectedTilePosition.y,
+						                               selectedTilePosition.z});
+				}
+				else
+				{
+					scrollRightKB = true;
+				}
 				break;
 			case SDLK_r:
-				if (selectedTilePosition.z < (map.size.z - 1))
-					selectedTilePosition.z++;
+				if (debugHotkeyMode)
+				{
+					if (selectedTilePosition.z < (map.size.z - 1))
+						this->setSelectedTilePosition({selectedTilePosition.x,
+						                               selectedTilePosition.y,
+						                               selectedTilePosition.z + 1});
+				}
 				break;
 			case SDLK_f:
-				if (selectedTilePosition.z > 0)
-					selectedTilePosition.z--;
+				if (debugHotkeyMode)
+				{
+					if (selectedTilePosition.z > 0)
+						this->setSelectedTilePosition({selectedTilePosition.x,
+						                               selectedTilePosition.y,
+						                               selectedTilePosition.z - 1});
+				}
 				break;
 		}
 	}
@@ -95,7 +147,26 @@ void TileView::eventOccurred(Event *e)
 			case SDLK_RIGHT:
 				scrollRightKB = false;
 				break;
+			case SDLK_w:
+				scrollUpKB = false;
+				break;
+			case SDLK_s:
+				scrollDownKB = false;
+				break;
+			case SDLK_a:
+				scrollLeftKB = false;
+				break;
+			case SDLK_d:
+				scrollRightKB = false;
+				break;
 		}
+	}
+	else if (e->type() == EVENT_WINDOW_DEACTIVATE)
+	{
+		scrollUpKB = false;
+		scrollDownKB = false;
+		scrollLeftKB = false;
+		scrollRightKB = false;
 	}
 	else if (e->type() == EVENT_FINGER_MOVE)
 	{

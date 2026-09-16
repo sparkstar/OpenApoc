@@ -10,7 +10,6 @@
 #include "forms/ticker.h"
 #include "forms/ui.h"
 #include "framework/configfile.h"
-#include "framework/data.h"
 #include "framework/event.h"
 #include "framework/font.h"
 #include "framework/framework.h"
@@ -35,7 +34,6 @@
 #include "game/state/message.h"
 #include "game/state/rules/aequipmenttype.h"
 #include "game/state/rules/battle/battlemap.h"
-#include "game/state/rules/city/baselayout.h"
 #include "game/state/rules/city/citycommonsamplelist.h"
 #include "game/state/rules/city/scenerytiletype.h"
 #include "game/state/rules/city/ufopaedia.h"
@@ -54,7 +52,6 @@
 #include "game/ui/base/vequipscreen.h"
 #include "game/ui/battle/battlebriefing.h"
 #include "game/ui/city/alertscreen.h"
-#include "game/ui/city/basebuyscreen.h"
 #include "game/ui/city/basedefensescreen.h"
 #include "game/ui/city/baseselectscreen.h"
 #include "game/ui/city/bribescreen.h"
@@ -68,6 +65,7 @@
 #include "game/ui/components/locationscreen.h"
 #include "game/ui/general/aequipscreen.h"
 #include "game/ui/general/ingameoptions.h"
+#include "game/ui/general/mainmenu.h"
 #include "game/ui/general/messagebox.h"
 #include "game/ui/general/messagelogscreen.h"
 #include "game/ui/general/notificationscreen.h"
@@ -75,6 +73,7 @@
 #include "game/ui/ufopaedia/ufopaediaview.h"
 #include "library/sp.h"
 #include "library/strings_format.h"
+#include <algorithm>
 #include <glm/glm.hpp>
 
 // Uncomment to start with paused
@@ -142,18 +141,11 @@ sp<Facility> findCurrentResearchFacility(sp<GameState> state, AgentType::Role ro
 			if (a && a->type->role == role)
 			{
 				state->current_base = a->homeBuilding->base;
-				if (a->assigned_to_lab)
+				if (a->isAssignedToLab())
 				{
-					auto thisRef = StateRef<Agent>{state.get(), a};
 					for (auto &fac : state->current_base->facilities)
 					{
-						if (!fac->lab)
-						{
-							continue;
-						}
-						auto it = std::find(fac->lab->assigned_agents.begin(),
-						                    fac->lab->assigned_agents.end(), thisRef);
-						if (it != fac->lab->assigned_agents.end())
+						if (fac->lab == a->lab_assigned)
 						{
 							lab = fac;
 							break;
@@ -519,9 +511,9 @@ void CityView::tryOpenUfopaediaEntry(StateRef<UfopaediaEntry> ufopaediaEntry)
 		sp<UfopaediaCategory> ufopaedia_category;
 		for (auto &cat : this->state->ufopaedia)
 		{
-			for (auto &entry : cat.second->entries)
+			for (auto &entryRef : cat.second->entries)
 			{
-				if (ufopaediaEntry == entry.second)
+				if (ufopaediaEntry == entryRef)
 				{
 					ufopaedia_category = cat.second;
 					break;
@@ -532,7 +524,7 @@ void CityView::tryOpenUfopaediaEntry(StateRef<UfopaediaEntry> ufopaediaEntry)
 		}
 		if (!ufopaedia_category)
 		{
-			LogError("No UFOPaedia category found for entry %s", ufopaediaEntry->title);
+			LogError("No UFOPaedia category found for entry {0}", ufopaediaEntry->title);
 		}
 		fw().stageQueueCommand(
 		    {StageCmd::Command::PUSH,
@@ -548,13 +540,13 @@ void CityView::orderGoToBase()
 		{
 			if (v && v->owner == this->state->getPlayer())
 			{
-				LogInfo("Goto base for vehicle \"%s\"", v->name);
+				LogInfo("Goto base for vehicle \"{0}\"", v->name);
 				auto bld = v->homeBuilding;
 				if (!bld)
 				{
-					LogError("Vehicle \"%s\" has no building", v->name);
+					LogError("Vehicle \"{0}\" has no building", v->name);
 				}
-				LogInfo("Vehicle \"%s\" goto building \"%s\"", v->name, bld->name);
+				LogInfo("Vehicle \"{0}\" goto building \"{1}\"", v->name, bld->name);
 				// FIXME: Don't clear missions if not replacing current mission
 				if (v->city.id == "CITYMAP_HUMAN")
 				{
@@ -573,13 +565,13 @@ void CityView::orderGoToBase()
 	{
 		for (auto &a : this->state->current_city->cityViewSelectedSoldiers)
 		{
-			LogInfo("Goto base for vehicle \"%s\"", a->name);
+			LogInfo("Goto base for vehicle \"{0}\"", a->name);
 			auto bld = a->homeBuilding;
 			if (!bld)
 			{
-				LogError("Vehicle \"%s\" has no building", a->name);
+				LogError("Vehicle \"{0}\" has no building", a->name);
 			}
-			LogInfo("Vehicle \"%s\" goto building \"%s\"", a->name, bld->name);
+			LogInfo("Vehicle \"{0}\" goto building \"{1}\"", a->name, bld->name);
 			// FIXME: Don't clear missions if not replacing current mission
 			a->setMission(*this->state, AgentMission::gotoBuilding(*this->state, *a, bld));
 		}
@@ -623,7 +615,7 @@ void CityView::orderMove(StateRef<Building> building, bool alternative)
 		{
 			if (v && v->owner == this->state->getPlayer())
 			{
-				LogInfo("Vehicle \"%s\" goto building \"%s\"", v->name, building->name);
+				LogInfo("Vehicle \"{0}\" goto building \"{1}\"", v->name, building->name);
 				// FIXME: Don't clear missions if not replacing current mission
 				v->setMission(*state,
 				              VehicleMission::gotoBuilding(*state, *v, building, useTeleporter));
@@ -640,7 +632,7 @@ void CityView::orderMove(StateRef<Building> building, bool alternative)
 			{
 				continue;
 			}
-			LogInfo("Agent \"%s\" goto building \"%s\"", a->name, building->name);
+			LogInfo("Agent \"{0}\" goto building \"{1}\"", a->name, building->name);
 			// FIXME: Don't clear missions if not replacing current mission
 			a->setMission(*state,
 			              AgentMission::gotoBuilding(*state, *a, building, useTeleporter, useTaxi));
@@ -1180,7 +1172,7 @@ void CityView::setSelectedTab(int tabIndex)
 {
 	if (tabIndex < 0 || tabIndex > uiTabs.size())
 	{
-		LogError("Trying to select invalid tab: %d", tabIndex);
+		LogError("Trying to select invalid tab: {0}", tabIndex);
 		return;
 	}
 	for (auto tab : uiTabs)
@@ -1212,7 +1204,7 @@ CityView::CityView(sp<GameState> state)
 	baseForm->findControlTyped<RadioButton>("BUTTON_SPEED1")->setChecked(true);
 	for (size_t i = 0; i < NUM_TABS; ++i)
 	{
-		sp<Form> f = baseForm->findControlTyped<Form>(format("SUBFORM_TAB_%d", i + 1));
+		sp<Form> f = baseForm->findControlTyped<Form>(format("SUBFORM_TAB_{0}", i + 1));
 		f->takesFocus = false;
 		this->uiTabs.push_back(f);
 	}
@@ -1223,7 +1215,7 @@ CityView::CityView(sp<GameState> state)
 
 	for (size_t i = 0; i < this->uiTabs.size(); ++i)
 	{
-		this->baseForm->findControl(format("BUTTON_TAB_%d", i + 1))
+		this->baseForm->findControl(format("BUTTON_TAB_{0}", i + 1))
 		    ->addCallback(FormEventType::ButtonClick,
 		                  [this, i](Event *)
 		                  {
@@ -1272,22 +1264,20 @@ CityView::CityView(sp<GameState> state)
 	                  });
 	this->baseForm->findControl("BUTTON_SHOW_SCORE")
 	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *) {
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<ScoreScreen>(this->state)});
-	        });
+	        FormEventType::ButtonClick, [this](Event *)
+	        { fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<ScoreScreen>(this->state)}); });
 	this->baseForm->findControl("BUTTON_SHOW_UFOPAEDIA")
-	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *) {
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<UfopaediaView>(this->state)});
-	        });
+	    ->addCallback(FormEventType::ButtonClick,
+	                  [this](Event *) {
+		                  fw().stageQueueCommand(
+		                      {StageCmd::Command::PUSH, mksp<UfopaediaView>(this->state)});
+	                  });
 	this->baseForm->findControl("BUTTON_SHOW_OPTIONS")
-	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *) {
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<InGameOptions>(this->state)});
-	        });
+	    ->addCallback(FormEventType::ButtonClick,
+	                  [this](Event *) {
+		                  fw().stageQueueCommand(
+		                      {StageCmd::Command::PUSH, mksp<InGameOptions>(this->state)});
+	                  });
 	this->baseForm->findControl("BUTTON_SHOW_LOG")
 	    ->addCallback(FormEventType::ButtonClick,
 	                  [this](Event *) {
@@ -1307,10 +1297,8 @@ CityView::CityView(sp<GameState> state)
 	auto baseManagementForm = this->uiTabs[0];
 	baseManagementForm->findControl("BUTTON_SHOW_BASE")
 	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *) {
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<BaseScreen>(this->state)});
-	        });
+	        FormEventType::ButtonClick, [this](Event *)
+	        { fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<BaseScreen>(this->state)}); });
 	baseManagementForm->findControl("BUTTON_BUILD_BASE")
 	    ->addCallback(FormEventType::ButtonClick,
 	                  [this](Event *)
@@ -1322,10 +1310,10 @@ CityView::CityView(sp<GameState> state)
 	auto vehicleForm = this->uiTabs[1];
 	for (int i = 0; i < weaponDisabled.size(); i++)
 	{
-		vehicleForm->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_%d_DISABLED", i + 1))
+		vehicleForm->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_{0}_DISABLED", i + 1))
 		    ->addCallback(FormEventType::CheckBoxSelected, [this, i](FormsEvent *e [[maybe_unused]])
 		                  { orderDisableWeapon(i, true); });
-		vehicleForm->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_%d_DISABLED", i + 1))
+		vehicleForm->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_{0}_DISABLED", i + 1))
 		    ->addCallback(FormEventType::CheckBoxDeSelected,
 		                  [this, i](FormsEvent *e [[maybe_unused]])
 		                  { orderDisableWeapon(i, false); });
@@ -1821,8 +1809,8 @@ CityView::CityView(sp<GameState> state)
 	auto font = ui().getFont("smallset");
 	for (int i = 0; i <= state->current_city->roadSegments.size(); i++)
 	{
-		debugLabelsOK.push_back(font->getString(format("%d", i)));
-		debugLabelsDead.push_back(font->getString(format("-%d-", i)));
+		debugLabelsOK.push_back(font->getString(format("{0}", i)));
+		debugLabelsDead.push_back(font->getString(format("-{0}-", i)));
 	}
 
 #ifdef DEBUG_START_PAUSE
@@ -1893,11 +1881,11 @@ void CityView::refreshBaseView()
 	for (auto &pair : state->player_bases)
 	{
 		auto &viewBase = pair.second;
-		auto viewName = format("BUTTON_BASE_%d", ++b);
+		auto viewName = format("BUTTON_BASE_{0}", ++b);
 		auto view = this->uiTabs[0]->findControlTyped<GraphicButton>(viewName);
 		if (!view)
 		{
-			LogError("Failed to find UI control matching \"%s\"", viewName);
+			LogError("Failed to find UI control matching \"{0}\"", viewName);
 		}
 		view->setVisible(true);
 		view->setData(viewBase);
@@ -2176,7 +2164,7 @@ void CityView::update()
 			switchDimension = false;
 		}
 	}
-	if (DEBUG_SHOW_ALIEN ? state->current_city.id != "CITYMAP_ALIEN" : switchDimension)
+	if (DEBUG_FORCE_ALIEN_DIMENSION ? state->current_city.id != "CITYMAP_ALIEN" : switchDimension)
 	{
 		setUpdateSpeed(CityUpdateSpeed::Speed1);
 		for (auto &newCity : state->cities)
@@ -2192,7 +2180,7 @@ void CityView::update()
 					state->current_city = {state.get(), newCity.first};
 				}
 				auto cityView = mksp<CityView>(state);
-				cityView->DEBUG_SHOW_ALIEN = DEBUG_SHOW_ALIEN;
+				cityView->DEBUG_FORCE_ALIEN_DIMENSION = DEBUG_FORCE_ALIEN_DIMENSION;
 				fw().stageQueueCommand({StageCmd::Command::REPLACEALL, cityView});
 				return;
 			}
@@ -2427,25 +2415,25 @@ void CityView::update()
 				if (weaponType[i])
 				{
 					uiTabs[1]
-					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_%d", i + 1))
+					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_{0}", i + 1))
 					    ->setImage(weaponType[i]->icon);
 					uiTabs[1]
-					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_%d", i + 1))
-					    ->ToolTipText = tr(weaponType[i]->name);
+					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_{0}", i + 1))
+					    ->ToolTipText = weaponType[i]->name;
 					uiTabs[1]
-					    ->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_%d_DISABLED", i + 1))
+					    ->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_{0}_DISABLED", i + 1))
 					    ->setVisible(true);
 				}
 				else
 				{
 					uiTabs[1]
-					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_%d", i + 1))
+					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_{0}", i + 1))
 					    ->setImage(nullptr);
 					uiTabs[1]
-					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_%d", i + 1))
+					    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_{0}", i + 1))
 					    ->ToolTipText = "";
 					uiTabs[1]
-					    ->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_%d_DISABLED", i + 1))
+					    ->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_{0}_DISABLED", i + 1))
 					    ->setVisible(false);
 				}
 			}
@@ -2477,14 +2465,14 @@ void CityView::update()
 					}
 				}
 				uiTabs[1]
-				    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_%d_AMMO", i + 1))
+				    ->findControlTyped<Graphic>(format("VEHICLE_WEAPON_{0}_AMMO", i + 1))
 				    ->setImage(bar);
 			}
 			if (currentDisabled != weaponDisabled[i])
 			{
 				weaponDisabled[i] = currentDisabled;
 				uiTabs[1]
-				    ->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_%d_DISABLED", i + 1))
+				    ->findControlTyped<CheckBox>(format("VEHICLE_WEAPON_{0}_DISABLED", i + 1))
 				    ->setChecked(currentDisabled);
 			}
 		}
@@ -2509,7 +2497,7 @@ void CityView::update()
 			StateRef<Base> base;
 			if (agent->type->role == AgentType::Role::Soldier)
 			{
-				auto agentRName = tr(agent->getRankName()) + UString(" ") + agent->name;
+				auto agentRName = format(tr("{0} {1}"), agent->getRankName(), agent->name);
 				agentName->setText(agentRName);
 				if (agent->currentBuilding == agent->homeBuilding)
 				{
@@ -2525,20 +2513,19 @@ void CityView::update()
 					if (!agent->recentlyHired)
 					{
 						if (agent->currentBuilding)
-							agentAssignment->setText(tr("At") + UString(" ") +
-							                         tr(agent->currentBuilding->name));
+							agentAssignment->setText(
+							    format(tr("At {0}"), agent->currentBuilding->name));
 						else if (agent->currentVehicle && agent->currentVehicle->currentBuilding)
 							agentAssignment->setText(
-							    tr("At") + UString(" ") +
-							    tr(agent->currentVehicle->currentBuilding->name));
+							    format(tr("At {0}"), agent->currentVehicle->currentBuilding->name));
 						else if (!agent->missions.empty() && agent->missions.front().targetBuilding)
 						{
 							if (agent->missions.front().targetBuilding == agent->homeBuilding)
 								agentAssignment->setText(tr("Returning to base"));
 							else
 								agentAssignment->setText(
-								    tr("Traveling to:") + UString(" ") +
-								    tr(agent->missions.front().targetBuilding->name));
+								    format(tr("Traveling to: {0}"),
+								           agent->missions.front().targetBuilding->name));
 						}
 						else if (agent->currentVehicle &&
 						         !agent->currentVehicle->missions.empty() &&
@@ -2548,13 +2535,12 @@ void CityView::update()
 							    agent->homeBuilding)
 								agentAssignment->setText(tr("Returning to base"));
 							else
-								agentAssignment->setText(tr("Traveling to:") + UString(" ") +
-								                         tr(agent->currentVehicle->missions.front()
-								                                .targetBuilding->name));
+								agentAssignment->setText(format(
+								    tr("Traveling to: {0}"),
+								    agent->currentVehicle->missions.front().targetBuilding->name));
 						}
 						else
-							agentAssignment->setText(tr("Traveling to:") + UString(" ") +
-							                         tr("map point"));
+							agentAssignment->setText(tr("Traveling to: map point"));
 					}
 					else
 						agentAssignment->setText(tr("Reporting to base"));
@@ -2582,20 +2568,18 @@ void CityView::update()
 							break;
 						case TrainingAssignment::Physical:
 						{
-							UString efficiency = tr("Combat training (efficiency=");
 							auto usage = base->getUsage(*state, FacilityType::Capacity::Training);
 							usage = (100.0f / std::max(100.f, usage)) * 100;
-							efficiency += format("%.f%%", usage) + UString(")");
-							agentAssignment->setText(efficiency);
+							agentAssignment->setText(
+							    format(tr("Combat training (efficiency={0:.0f}%)"), usage));
 							break;
 						}
 						case TrainingAssignment::Psi:
 						{
-							UString efficiency = tr("Psionic training (efficiency=");
 							auto usage = base->getUsage(*state, FacilityType::Capacity::Psi);
 							usage = (100.0f / std::max(100.f, usage)) * 100;
-							efficiency += format("%.f%%", usage) + UString(")");
-							agentAssignment->setText(efficiency);
+							agentAssignment->setText(
+							    format(tr("Psionic training (efficiency={0:.0f}%)"), usage));
 							break;
 						}
 					}
@@ -2698,33 +2682,20 @@ void CityView::update()
 			if (agent->type->role == AgentType::Role::BioChemist)
 			{
 				agentName->setText(agent->name);
-				if (agent->assigned_to_lab)
+				if (agent->isAssignedToLab())
 				{
-					auto thisRef = StateRef<Agent>{state.get(), agent};
-					for (auto &fac : agent->homeBuilding->base->facilities)
+					if (agent->lab_assigned->current_project)
 					{
-						if (!fac->lab)
-						{
-							continue;
-						}
-						auto it = std::find(fac->lab->assigned_agents.begin(),
-						                    fac->lab->assigned_agents.end(), thisRef);
-						if (it != fac->lab->assigned_agents.end())
-						{
-							if (fac->lab->current_project)
-							{
-								UString pr = tr(fac->lab->current_project->name);
-								int progress = (static_cast<float>(
-								                    fac->lab->current_project->man_hours_progress) /
-								                fac->lab->current_project->man_hours) *
-								               100;
-								agentAssignment->setText(pr + format(" (%d%%)", progress));
-							}
-							else
-								agentAssignment->setText(tr("No project assigned"));
-							break;
-						}
+						UString pr = agent->lab_assigned->current_project->name;
+						int progress =
+						    (static_cast<float>(
+						         agent->lab_assigned->current_project->man_hours_progress) /
+						     agent->lab_assigned->current_project->man_hours) *
+						    100;
+						agentAssignment->setText(pr + format(" ({0}%)", progress));
 					}
+					else
+						agentAssignment->setText(tr("No project assigned"));
 				}
 				else
 				{
@@ -2826,36 +2797,22 @@ void CityView::update()
 			if (agent->type->role == AgentType::Role::Engineer)
 			{
 				agentName->setText(agent->name);
-				if (agent->assigned_to_lab)
+				if (agent->isAssignedToLab())
 				{
-					auto thisRef = StateRef<Agent>{state.get(), agent};
-					for (auto &fac : agent->homeBuilding->base->facilities)
+					if (agent->lab_assigned->current_project)
 					{
-						if (!fac->lab)
-						{
-							continue;
-						}
-						auto it = std::find(fac->lab->assigned_agents.begin(),
-						                    fac->lab->assigned_agents.end(), thisRef);
-						if (it != fac->lab->assigned_agents.end())
-						{
-							if (fac->lab->current_project)
-							{
-								UString pr = tr(fac->lab->current_project->name);
-								int progress =
-								    (static_cast<float>(fac->lab->manufacture_man_hours_invested +
-								                        fac->lab->current_project->man_hours *
-								                            fac->lab->manufacture_done) /
-								     (fac->lab->current_project->man_hours *
-								      fac->lab->manufacture_goal)) *
-								    100;
-								agentAssignment->setText(pr + format(" (%d%%)", progress));
-							}
-							else
-								agentAssignment->setText(tr("No project assigned"));
-							break;
-						}
+						UString pr = agent->lab_assigned->current_project->name;
+						int progress = (static_cast<float>(
+						                    agent->lab_assigned->manufacture_man_hours_invested +
+						                    agent->lab_assigned->current_project->man_hours *
+						                        agent->lab_assigned->manufacture_done) /
+						                (agent->lab_assigned->current_project->man_hours *
+						                 agent->lab_assigned->manufacture_goal)) *
+						               100;
+						agentAssignment->setText(pr + format(" ({0}%)", progress));
 					}
+					else
+						agentAssignment->setText(tr("No project assigned"));
 				}
 				else
 				{
@@ -2957,33 +2914,20 @@ void CityView::update()
 			if (agent->type->role == AgentType::Role::Physicist)
 			{
 				agentName->setText(agent->name);
-				if (agent->assigned_to_lab)
+				if (agent->isAssignedToLab())
 				{
-					auto thisRef = StateRef<Agent>{state.get(), agent};
-					for (auto &fac : agent->homeBuilding->base->facilities)
+					if (agent->lab_assigned->current_project)
 					{
-						if (!fac->lab)
-						{
-							continue;
-						}
-						auto it = std::find(fac->lab->assigned_agents.begin(),
-						                    fac->lab->assigned_agents.end(), thisRef);
-						if (it != fac->lab->assigned_agents.end())
-						{
-							if (fac->lab->current_project)
-							{
-								UString pr = tr(fac->lab->current_project->name);
-								int progress = (static_cast<float>(
-								                    fac->lab->current_project->man_hours_progress) /
-								                fac->lab->current_project->man_hours) *
-								               100;
-								agentAssignment->setText(pr + format(" (%d%%)", progress));
-							}
-							else
-								agentAssignment->setText(tr("No project assigned"));
-							break;
-						}
+						UString pr = agent->lab_assigned->current_project->name;
+						int progress =
+						    (static_cast<float>(
+						         agent->lab_assigned->current_project->man_hours_progress) /
+						     agent->lab_assigned->current_project->man_hours) *
+						    100;
+						agentAssignment->setText(pr + format(" ({0}%)", progress));
 					}
+					else
+						agentAssignment->setText(tr("No project assigned"));
 				}
 				else
 				{
@@ -3073,7 +3017,8 @@ void CityView::update()
 
 		if (!state->current_city->cityViewSelectedOtherVehicles.empty())
 		{
-			auto selectedVehicle = state->current_city->cityViewSelectedOtherVehicles.front();
+			const auto &selectedVehicle =
+			    state->current_city->cityViewSelectedOtherVehicles.front();
 			if (selectedVehicle->owner == state->getPlayer())
 			{
 				uiTabs[6]->findControlTyped<Label>("TEXT_VEHICLE_NAME")->setText("");
@@ -3081,9 +3026,16 @@ void CityView::update()
 			}
 			else
 			{
+				const auto selectedVehicleIsUnresearchedUfo =
+				    selectedVehicle->owner == state->getAliens() &&
+				    !selectedVehicle->type->ufopaedia_entry->dependency.satisfied();
+
+				const auto vehicleDisplayName =
+				    selectedVehicleIsUnresearchedUfo ? tr("UFO") : selectedVehicle->name;
+
 				uiTabs[6]
 				    ->findControlTyped<Label>("TEXT_VEHICLE_NAME")
-				    ->setText(selectedVehicle->name);
+				    ->setText(vehicleDisplayName);
 				uiTabs[6]
 				    ->findControlTyped<Label>("TEXT_VEHICLE_OWNER")
 				    ->setText(selectedVehicle->owner->name);
@@ -3097,13 +3049,13 @@ void CityView::update()
 
 		int currentVehicleIndex = -1;
 		std::set<sp<Vehicle>> vehiclesMIA;
-		for (auto &i : hostileVehicleInfoList)
+		for (const auto &i : hostileVehicleInfoList)
 		{
 			vehiclesMIA.insert(i.vehicle);
 		}
-		for (auto &v : state->vehicles)
+		for (const auto &v : state->vehicles)
 		{
-			auto vehicle = v.second;
+			const auto &vehicle = v.second;
 			if (!v.second->tileObject || v.second->city != state->current_city ||
 			    v.second->isDead())
 			{
@@ -3111,73 +3063,74 @@ void CityView::update()
 			}
 
 			// Show selected non-player vehicle in list of hostile vehicles
-			if (state->getPlayer()->isRelatedTo(vehicle->owner) != Organisation::Relation::Hostile)
+			if (state->getPlayer()->isRelatedTo(vehicle->owner) !=
+			        Organisation::Relation::Hostile &&
+			    (vehicle->owner == state->getPlayer() ||
+			     state->current_city->cityViewSelectedOtherVehicles.empty() ||
+			     state->current_city->cityViewSelectedOtherVehicles.front() != v.second))
 			{
-				if (vehicle->owner == state->getPlayer() ||
-				    state->current_city->cityViewSelectedOtherVehicles.empty() ||
-				    state->current_city->cityViewSelectedOtherVehicles.front() != v.second)
-				{
-					continue;
-				}
+				continue;
 			}
 
 			currentVehicleIndex++;
-			auto info = ControlGenerator::createVehicleInfo(*state, vehicle);
+			const auto info = ControlGenerator::createVehicleInfo(*state, vehicle);
 			vehiclesMIA.erase(info.vehicle);
-			bool redo = currentVehicleIndex >= hostileVehicleInfoList.size() ||
-			            hostileVehicleInfoList[currentVehicleIndex] != info;
-			if (redo)
+			const auto redo = currentVehicleIndex >= hostileVehicleInfoList.size() ||
+			                  hostileVehicleInfoList[currentVehicleIndex] != info;
+
+			if (!redo)
+				continue;
+
+			auto control = ControlGenerator::createVehicleControl(*state, info);
+			control->addCallback(
+			    FormEventType::MouseDown,
+			    [this, vehicle](FormsEvent *e)
+			    {
+				    // if (!this->vanillaControls)
+				    //{
+				    //	if (Event::isPressed(e->forms().MouseInfo.Button,
+				    //		Event::MouseButton::Right))
+				    //	{
+				    //		// [Alt/Ctrl] + [Shift] opens equipment
+				    //		if ((modifierLShift || modifierRShift) &&
+				    //			(modifierLAlt || modifierRAlt || modifierLCtrl ||
+				    //				modifierRCtrl))
+				    //		{
+				    //			// Equipscreen for owner vehicles
+				    //			auto equipScreen = mksp<VEquipScreen>(this->state);
+				    //			equipScreen->setSelectedVehicle(vehicle);
+				    //			fw().stageQueueCommand({ StageCmd::Command::PUSH, equipScreen
+				    //}); 			return;
+				    //		}
+				    //		// [Shift] opens location
+				    //		if (modifierLShift || modifierRShift)
+				    //		{
+				    //			// Location screen
+				    //			fw().stageQueueCommand(
+				    //			{ StageCmd::Command::PUSH,
+				    //				mksp<LocationScreen>(this->state, vehicle) });
+				    //			return;
+				    //		}
+				    //	}
+				    //}
+				    handleClickedVehicle(
+				        StateRef<Vehicle>{state.get(), Vehicle::getId(*state, vehicle)},
+				        Event::isPressed(e->forms().MouseInfo.Button, Event::MouseButton::Right),
+				        CitySelectionState::Normal);
+			    });
+
+			if (currentVehicleIndex >= hostileVehicleInfoList.size())
 			{
-				auto control = ControlGenerator::createVehicleControl(*state, info);
-				control->addCallback(
-				    FormEventType::MouseDown,
-				    [this, vehicle](FormsEvent *e)
-				    {
-					    // if (!this->vanillaControls)
-					    //{
-					    //	if (Event::isPressed(e->forms().MouseInfo.Button,
-					    //		Event::MouseButton::Right))
-					    //	{
-					    //		// [Alt/Ctrl] + [Shift] opens equipment
-					    //		if ((modifierLShift || modifierRShift) &&
-					    //			(modifierLAlt || modifierRAlt || modifierLCtrl ||
-					    //				modifierRCtrl))
-					    //		{
-					    //			// Equipscreen for owner vehicles
-					    //			auto equipScreen = mksp<VEquipScreen>(this->state);
-					    //			equipScreen->setSelectedVehicle(vehicle);
-					    //			fw().stageQueueCommand({ StageCmd::Command::PUSH, equipScreen
-					    //}); 			return;
-					    //		}
-					    //		// [Shift] opens location
-					    //		if (modifierLShift || modifierRShift)
-					    //		{
-					    //			// Location screen
-					    //			fw().stageQueueCommand(
-					    //			{ StageCmd::Command::PUSH,
-					    //				mksp<LocationScreen>(this->state, vehicle) });
-					    //			return;
-					    //		}
-					    //	}
-					    //}
-					    handleClickedVehicle(
-					        StateRef<Vehicle>{state.get(), Vehicle::getId(*state, vehicle)},
-					        Event::isPressed(e->forms().MouseInfo.Button,
-					                         Event::MouseButton::Right),
-					        CitySelectionState::Normal);
-				    });
-				if (currentVehicleIndex >= hostileVehicleInfoList.size())
-				{
-					hostileVehicleInfoList.push_back(info);
-				}
-				else
-				{
-					hostileVehicleInfoList[currentVehicleIndex] = info;
-				}
-				hostileVehicleList->replaceItem(control);
+				hostileVehicleInfoList.push_back(info);
 			}
+			else
+			{
+				hostileVehicleInfoList[currentVehicleIndex] = info;
+			}
+
+			hostileVehicleList->replaceItem(control);
 		}
-		for (auto &v : vehiclesMIA)
+		for (const auto &v : vehiclesMIA)
 		{
 			hostileVehicleList->removeByData<Vehicle>(v);
 		}
@@ -3194,27 +3147,26 @@ void CityView::update()
 		                    static_cast<int>(selectedOrg->isRelatedTo(state->getPlayer())) ==
 		                        state->current_city->cityViewOrgButtonIndex - 1))
 		{
-			uiTabs[7]->findControlTyped<Label>("TEXT_ORG_NAME")->setText(tr(selectedOrg->name));
-			UString relation = "";
+			uiTabs[7]->findControlTyped<Label>("TEXT_ORG_NAME")->setText(selectedOrg->name);
+			UString relation;
 			switch (selectedOrg->isRelatedTo(state->getPlayer()))
 			{
 				case Organisation::Relation::Allied:
-					relation += tr(": allied with:");
+					relation = format(tr("allied with: {0}"), state->getPlayer()->name);
 					break;
 				case Organisation::Relation::Friendly:
-					relation += tr(": friendly with:");
+					relation = format(tr("friendly with: {0}"), state->getPlayer()->name);
 					break;
 				case Organisation::Relation::Neutral:
-					relation += tr(": neutral towards:");
+					relation = format(tr("neutral towards: {0}"), state->getPlayer()->name);
 					break;
 				case Organisation::Relation::Unfriendly:
-					relation += tr(": unfriendly towards:");
+					relation = format(tr("unfriendly towards: {0}"), state->getPlayer()->name);
 					break;
 				case Organisation::Relation::Hostile:
-					relation += tr(": hostile towards:");
+					relation = format(tr("hostile towards: {0}"), state->getPlayer()->name);
 					break;
 			}
-			relation += UString(" ") + tr(state->getPlayer()->name);
 			uiTabs[7]->findControlTyped<Label>("TEXT_ORG_RELATION")->setText(relation);
 		}
 		else
@@ -3242,7 +3194,7 @@ void CityView::update()
 			        ? (Organisation::Relation)0
 			        : (Organisation::Relation)(state->current_city->cityViewOrgButtonIndex - 1);
 			if (state->current_city->cityViewOrgButtonIndex != 0 &&
-			    state->getPlayer()->isRelatedTo({state.get(), o.first}) != rel)
+			    o.second->isRelatedTo(state->getPlayer()) != rel)
 			{
 				continue;
 			}
@@ -3317,23 +3269,27 @@ void CityView::update()
 	baseForm->update();
 	overlayTab->update();
 
+	auto isoFollow =
+	    config().getBool("OpenApoc.NewFeature.IsoOnlyFollow") && viewMode == TileViewMode::Strategy;
+
 	// If we have 'follow vehicle' enabled we clobber any other movement that may have occurred in
 	// this frame
-	if (this->followVehicle && this->updateSpeed != CityUpdateSpeed::Pause)
+	if (this->followVehicle && this->updateSpeed != CityUpdateSpeed::Pause && !isoFollow)
 	{
 		if (activeTab == uiTabs[1] && !state->current_city->cityViewSelectedOwnedVehicles.empty())
 		{
 			auto v = state->current_city->cityViewSelectedOwnedVehicles.front();
 			if (v->city == state->current_city)
 			{
-				// Don't follow if vehicle is in building
-				if (!v->currentBuilding)
+				// Don't follow if vehicle is in building or idle
+				if (!v->currentBuilding && !v->missions.empty())
 				{
 					this->setScreenCenterTile(v->position);
 				}
 			}
 		}
-		else if (activeTab == uiTabs[2] && !state->current_city->cityViewSelectedSoldiers.empty())
+		else if (activeTab == uiTabs[2] && !state->current_city->cityViewSelectedSoldiers.empty() &&
+		         !isoFollow)
 		{
 			auto a = state->current_city->cityViewSelectedSoldiers.front();
 
@@ -3341,8 +3297,8 @@ void CityView::update()
 			{
 				if (a->currentVehicle)
 				{
-					// Don't follow if current vehicle is in building
-					if (!a->currentVehicle->currentBuilding)
+					// Don't follow if current vehicle is in building or idle
+					if (!a->currentVehicle->currentBuilding && !a->currentVehicle->missions.empty())
 					{
 						this->setScreenCenterTile(a->currentVehicle->position);
 					}
@@ -3495,7 +3451,7 @@ bool CityView::handleKeyDown(Event *e)
 								stuffToRepair.insert(s);
 							}
 						}
-						LogInfo("Repairing %u tiles out of %u",
+						LogInfo("Repairing {0} tiles out of {1}",
 						        static_cast<unsigned>(stuffToRepair.size()),
 						        static_cast<unsigned>(state->current_city->scenery.size()));
 
@@ -3543,14 +3499,14 @@ bool CityView::handleKeyDown(Event *e)
 						if (type.second->crashed_sprite)
 						{
 							validTypes.emplace_back(state.get(), type.second);
-							LogWarning("Valid UFO type: %s", type.second->name);
+							LogWarning("Valid UFO type: {0}", type.second->name);
 						}
 					}
 
 					for (int i = 0; i < 3; i++)
 					{
 						auto type = pickRandom(state->rng, validTypes);
-						LogWarning("Crashing %s", type->name);
+						LogWarning("Crashing {0}", type->name);
 						pos.z = 9 + i;
 						auto ufo = state->current_city->placeVehicle(*state, {state.get(), type},
 						                                             state->getAliens(), pos);
@@ -3603,6 +3559,11 @@ bool CityView::handleKeyDown(Event *e)
 					}
 
 					return true;
+				}
+				case SDLK_p:
+				{
+					LogWarning("Moving portals...");
+					state->current_city->generatePortals(*state);
 				}
 			}
 		}
@@ -3773,73 +3734,70 @@ bool CityView::handleMouseDown(Event *e)
 					scenery =
 					    std::dynamic_pointer_cast<TileObjectScenery>(collision.obj)->getOwner();
 					building = scenery->building;
-					if (true)
-					{
-						Vec3<int> t = scenery->currentPosition;
-						UString debug = "";
-						debug +=
-						    format("\nCLICKED %s SCENERY %s at %s BUILDING %s",
-						           scenery->falling || scenery->willCollapse() ? "FALLING" : "OK",
-						           scenery->type.id, t, building.id);
-						// debug += format("\n LOS BLOCK %d", battle.getLosBlockID(t.x, t.y, t.z));
 
-						debug += format(
-						    "\nHt [%d] Con [%d] Type [%d|%d|%d] Road [%d%d%d%d] Hill [%d%d%d%d] "
-						    "Tube "
-						    "[%d%d%d%d%d%d]",
-						    scenery->type->height, scenery->type->constitution,
-						    (int)scenery->type->tile_type, (int)scenery->type->road_type,
-						    (int)scenery->type->walk_mode, (int)scenery->type->connection[0],
-						    (int)scenery->type->connection[1], (int)scenery->type->connection[2],
-						    (int)scenery->type->connection[3], (int)scenery->type->hill[0],
-						    (int)scenery->type->hill[1], (int)scenery->type->hill[2],
-						    (int)scenery->type->hill[3], (int)scenery->type->tube[0],
-						    (int)scenery->type->tube[1], (int)scenery->type->tube[2],
-						    (int)scenery->type->tube[3], (int)scenery->type->tube[4],
-						    (int)scenery->type->tube[5]);
-						auto &map = *state->current_city->map;
-						for (auto &p : scenery->supportedBy)
+					Vec3<int> t = scenery->currentPosition;
+					UString debug = "";
+					debug += format("\nCLICKED {0} SCENERY {1} at {2} BUILDING {3}",
+					                scenery->falling || scenery->willCollapse() ? "FALLING" : "OK",
+					                scenery->type.id, t, building.id);
+					// debug += format("\n LOS BLOCK {0}", battle.getLosBlockID(t.x, t.y, t.z));
+
+					debug +=
+					    format("\nHt [{0}] Con [{1}] Type [{2}|{3}|{4}] Road [{5}{6}{7}{8}] Hill "
+					           "[{9}{10}{11}{12}] "
+					           "Tube "
+					           "[{13}{14}{15}{16}{17}{18}]",
+					           scenery->type->height, scenery->type->constitution,
+					           (int)scenery->type->tile_type, (int)scenery->type->road_type,
+					           (int)scenery->type->walk_mode, (int)scenery->type->connection[0],
+					           (int)scenery->type->connection[1], (int)scenery->type->connection[2],
+					           (int)scenery->type->connection[3], (int)scenery->type->hill[0],
+					           (int)scenery->type->hill[1], (int)scenery->type->hill[2],
+					           (int)scenery->type->hill[3], (int)scenery->type->tube[0],
+					           (int)scenery->type->tube[1], (int)scenery->type->tube[2],
+					           (int)scenery->type->tube[3], (int)scenery->type->tube[4],
+					           (int)scenery->type->tube[5]);
+					auto &map = *state->current_city->map;
+					for (auto &p : scenery->supportedBy)
+					{
+						debug += format("\nCan be supported by {0}", p);
+					}
+					for (auto &p : scenery->supportedParts)
+					{
+						debug += format("\nSupports {0}", p);
+					}
+					for (int x = t.x - 1; x <= t.x + 1; x++)
+					{
+						for (int y = t.y - 1; y <= t.y + 1; y++)
 						{
-							debug += format("\nCan be supported by %s", p);
-						}
-						for (auto &p : scenery->supportedParts)
-						{
-							debug += format("\nSupports %s", p);
-						}
-						for (int x = t.x - 1; x <= t.x + 1; x++)
-						{
-							for (int y = t.y - 1; y <= t.y + 1; y++)
+							for (int z = t.z - 1; z <= t.z + 1; z++)
 							{
-								for (int z = t.z - 1; z <= t.z + 1; z++)
+								if (x < 0 || x >= map.size.x || y < 0 || y >= map.size.y || z < 0 ||
+								    z >= map.size.z)
 								{
-									if (x < 0 || x >= map.size.x || y < 0 || y >= map.size.y ||
-									    z < 0 || z >= map.size.z)
+									continue;
+								}
+								auto tile2 = map.getTile(x, y, z);
+								for (auto &o2 : tile2->ownedObjects)
+								{
+									if (o2->getType() == TileObject::Type::Scenery)
 									{
-										continue;
-									}
-									auto tile2 = map.getTile(x, y, z);
-									for (auto &o2 : tile2->ownedObjects)
-									{
-										if (o2->getType() == TileObject::Type::Scenery)
+										auto mp2 = std::static_pointer_cast<TileObjectScenery>(o2)
+										               ->getOwner();
+										for (auto &p : mp2->supportedParts)
 										{
-											auto mp2 =
-											    std::static_pointer_cast<TileObjectScenery>(o2)
-											        ->getOwner();
-											for (auto &p : mp2->supportedParts)
+											if (p == t)
 											{
-												if (p == t)
-												{
-													debug += format(
-													    "\nActually supported by %s at %d %d %d",
-													    mp2->type.id, x - t.x, y - t.y, z - t.z);
-												}
+												debug += format(
+												    "\nActually supported by {0} at {1} {2} {3}",
+												    mp2->type.id, x - t.x, y - t.y, z - t.z);
 											}
 										}
 									}
 								}
 							}
-							LogWarning("%s", debug);
 						}
+						LogWarning("{0}", debug);
 					}
 
 					if (modifierLAlt && modifierLCtrl && modifierLShift)
@@ -3860,14 +3818,14 @@ bool CityView::handleMouseDown(Event *e)
 				{
 					vehicle =
 					    std::dynamic_pointer_cast<TileObjectVehicle>(collision.obj)->getVehicle();
-					LogWarning("CLICKED VEHICLE %s at %s", vehicle->name, vehicle->position);
+					LogWarning("CLICKED VEHICLE {0} at {1}", vehicle->name, vehicle->position);
 					for (auto &m : vehicle->missions)
 					{
-						LogWarning("Mission %s", m.getName());
+						LogWarning("Mission {0}", m.getName());
 					}
 					for (auto &c : vehicle->cargo)
 					{
-						LogInfo("Cargo %sx%d", c.id, c.count);
+						LogInfo("Cargo {0}x{1}", c.id, c.count);
 					}
 					if (modifierLAlt && modifierLCtrl && modifierLShift)
 					{
@@ -3908,15 +3866,15 @@ bool CityView::handleMouseDown(Event *e)
 				{
 					vehicle = std::dynamic_pointer_cast<TileObjectVehicle>(collisionVehicle.obj)
 					              ->getVehicle();
-					LogWarning("SECONDARY CLICK ON VEHICLE %s at %s", vehicle->name,
+					LogWarning("SECONDARY CLICK ON VEHICLE {0} at {1}", vehicle->name,
 					           vehicle->position);
 					for (auto &m : vehicle->missions)
 					{
-						LogWarning("Mission %s", m.getName());
+						LogWarning("Mission {0}", m.getName());
 					}
 					for (auto &c : vehicle->cargo)
 					{
-						LogInfo("Cargo %sx%d", c.id, c.count);
+						LogInfo("Cargo {0}x{1}", c.id, c.count);
 					}
 				}
 			}
@@ -3928,7 +3886,7 @@ bool CityView::handleMouseDown(Event *e)
 		{
 			projectile =
 			    std::dynamic_pointer_cast<TileObjectProjectile>(projCollision.obj)->getProjectile();
-			LogInfo("CLICKED PROJECTILE %d at %s", projectile->damage, projectile->position);
+			LogInfo("CLICKED PROJECTILE {0} at {1}", projectile->damage, projectile->position);
 
 			if (!vehicle && !scenery && !portal)
 			{
@@ -4033,6 +3991,58 @@ bool CityView::handleGameStateEvent(Event *e)
 				// Never pause for these
 				break;
 			}
+			case GameEventType::VehicleWithAlienLootInBaseWithNoContainment:
+			{
+				const auto vehicleEvent = dynamic_cast<GameVehicleEvent *>(e);
+				auto &vehicle = vehicleEvent->vehicle;
+				auto &cargo = vehicle->cargo;
+				auto &missions = vehicle->missions;
+				const auto &currentBuilding = vehicle->currentBuilding;
+				const auto &currentBase = currentBuilding->base;
+
+				// Do nothing to keep aliens on board
+				// Aliens are not destroyed and not stored into base
+				std::function<void()> keepOnBoardOption = std::function<void()>(
+				    [&]
+				    {
+					    // We are not allowed to call vehicle->clearMissions from here since it will
+					    // raise an exception.
+					    // We also need to add an offerService mission, otherwise
+					    // Vehicle::updateCargo will try to ferry this alien cargo again.
+					    // To solve this, we clear manually the vehicle mission list and add an
+					    // offerService mission that won't conclude at the end of this event
+					    // When Vehicle::updateCargo runs, it will detect this offerService mission
+					    // pending and will not try to ferry this alien cargo again.
+					    missions.clear();
+					    missions.push_back(
+					        VehicleMission::offerService(*state, *vehicle, currentBuilding));
+				    });
+
+				// Destroy all aliens in vehicle
+				std::function<void()> destroyOption = std::function<void()>(
+				    [&]
+				    {
+					    for (auto it = cargo.begin(); it != cargo.end();)
+					    {
+						    if (it->type == Cargo::Type::Bio)
+						    {
+							    it = cargo.erase(it);
+						    }
+					    }
+				    });
+
+				sp<MessageBox> messageBox = mksp<MessageBox>(
+				    MessageBox("No Alien Containment Facility",
+				               format("Alien specimens from tactical combat zone have arrived: {0}",
+				                      currentBase->name),
+				               MessageBox::ButtonOptions::YesNo, std::move(keepOnBoardOption),
+				               std::move(destroyOption), nullptr,
+				               {{"yes", "Keep on board"}, {"no", "Destroy"}}));
+
+				fw().stageQueueCommand({StageCmd::Command::PUSH, messageBox});
+
+				break;
+			}
 			default:
 			{
 				bool pause = false;
@@ -4061,7 +4071,7 @@ bool CityView::handleGameStateEvent(Event *e)
 			    {StageCmd::Command::PUSH,
 			     mksp<NotificationScreen>(
 			         state, *this,
-			         format("Aliens have taken over %s", gameOrgEvent->organisation->name),
+			         format("Aliens have taken over {0}", gameOrgEvent->organisation->name),
 			         gameEvent->type)});
 		}
 		break;
@@ -4168,8 +4178,8 @@ bool CityView::handleGameStateEvent(Event *e)
 			}
 
 			UString title = tr("Commence investigation");
-			UString message = format(tr("All selected units and crafts have arrived at %s. "
-			                            "Proceed with investigation? (%d units)"),
+			UString message = format(tr("All selected units and crafts have arrived at {0}. "
+			                            "Proceed with investigation? ({1} units)"),
 			                         building->name, agents.size());
 			fw().stageQueueCommand({StageCmd::Command::PUSH,
 			                        mksp<MessageBox>(
@@ -4216,9 +4226,9 @@ bool CityView::handleGameStateEvent(Event *e)
 			{
 				for (auto &cat : this->state->ufopaedia)
 				{
-					for (auto &entry : cat.second->entries)
+					for (auto &entryRef : cat.second->entries)
 					{
-						if (ufopaedia_entry == entry.second)
+						if (ufopaedia_entry == entryRef)
 						{
 							ufopaedia_category = cat.second;
 							break;
@@ -4229,14 +4239,15 @@ bool CityView::handleGameStateEvent(Event *e)
 				}
 				if (!ufopaedia_category)
 				{
-					LogError("No UFOPaedia category found for entry %s", ufopaedia_entry->title);
+					LogError("No UFOPaedia category found for entry {0}", ufopaedia_entry->title);
 				}
 			}
 			setUpdateSpeed(CityUpdateSpeed::Pause);
 			auto message_box = mksp<MessageBox>(
 			    tr("RESEARCH COMPLETE"),
-			    format("%s\n%s\n%s", tr("Research project completed:"), ev->topic->name,
-			           tr("Do you wish to view the UFOpaedia report?")),
+			    format(tr("Research project completed: {0}\nDo you wish to view the UFOpaedia "
+			              "report?"),
+			           ev->topic->name),
 			    MessageBox::ButtonOptions::YesNo,
 			    // "Yes" callback
 			    [game_state, lab_facility, ufopaedia_category, ufopaedia_entry]()
@@ -4308,7 +4319,7 @@ bool CityView::handleGameStateEvent(Event *e)
 			setUpdateSpeed(CityUpdateSpeed::Pause);
 			auto message_box = mksp<MessageBox>(
 			    tr("MANUFACTURE COMPLETED"),
-			    format("%s\n%s\n%s %d\n%s", lab_base->name, tr(item_name), tr("Quantity:"),
+			    format("{0}\n{1}\n{2} {3}\n{4}", lab_base->name, item_name, tr("Quantity:"),
 			           ev->goal, tr("Do you wish to reasign the Workshop?")),
 			    MessageBox::ButtonOptions::YesNo,
 			    // Yes callback
@@ -4368,7 +4379,7 @@ bool CityView::handleGameStateEvent(Event *e)
 			setUpdateSpeed(CityUpdateSpeed::Pause);
 			auto message_box =
 			    mksp<MessageBox>(tr("MANUFACTURING HALTED"),
-			                     format("%s\n%s\n%s %d/%d\n%s", lab_base->name, tr(item_name),
+			                     format("{0}\n{1}\n{2} {3}/{4}\n{5}", lab_base->name, item_name,
 			                            tr("Completion status:"), ev->done, ev->goal,
 			                            tr("Production costs exceed your available funds.")),
 			                     MessageBox::ButtonOptions::Ok);
@@ -4386,7 +4397,7 @@ bool CityView::handleGameStateEvent(Event *e)
 			setUpdateSpeed(CityUpdateSpeed::Pause);
 			auto message_box =
 			    mksp<MessageBox>(tr("FACILITY COMPLETED"),
-			                     format("%s\n%s", ev->base->name, tr(ev->facility->type->name)),
+			                     format("{0}\n{1}", ev->base->name, ev->facility->type->name),
 			                     MessageBox::ButtonOptions::Ok);
 			fw().stageQueueCommand({StageCmd::Command::PUSH, message_box});
 		}
@@ -4409,6 +4420,24 @@ bool CityView::handleGameStateEvent(Event *e)
 		{
 			setUpdateSpeed(CityUpdateSpeed::Pause);
 			showWeeklyFundingReport();
+		}
+		break;
+		case GameEventType::GameWon:
+		{
+			setUpdateSpeed(CityUpdateSpeed::Pause);
+			auto message_box = mksp<MessageBox>(
+			    tr("VICTORY"), gameEvent->message(), MessageBox::ButtonOptions::Ok, []()
+			    { fw().stageQueueCommand({StageCmd::Command::REPLACEALL, mksp<MainMenu>()}); });
+			fw().stageQueueCommand({StageCmd::Command::PUSH, message_box});
+		}
+		break;
+		case GameEventType::GameLost:
+		{
+			setUpdateSpeed(CityUpdateSpeed::Pause);
+			auto message_box = mksp<MessageBox>(
+			    tr("DEFEAT"), gameEvent->message(), MessageBox::ButtonOptions::Ok, []()
+			    { fw().stageQueueCommand({StageCmd::Command::REPLACEALL, mksp<MainMenu>()}); });
+			fw().stageQueueCommand({StageCmd::Command::PUSH, message_box});
 		}
 		break;
 		default:

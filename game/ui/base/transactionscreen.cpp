@@ -4,7 +4,6 @@
 #include "forms/graphicbutton.h"
 #include "forms/label.h"
 #include "forms/listbox.h"
-#include "forms/radiobutton.h"
 #include "forms/scrollbar.h"
 #include "forms/ui.h"
 #include "framework/event.h"
@@ -15,16 +14,14 @@
 #include "game/state/city/base.h"
 #include "game/state/city/building.h"
 #include "game/state/city/vehicle.h"
-#include "game/state/city/vequipment.h"
 #include "game/state/gamestate.h"
-#include "game/state/rules/city/vammotype.h"
 #include "game/state/rules/city/vehicletype.h"
 #include "game/state/rules/city/vequipmenttype.h"
-#include "game/state/shared/organisation.h"
 #include "game/ui/general/aequipmentsheet.h"
 #include "game/ui/general/messagebox.h"
 #include "game/ui/general/transactioncontrol.h"
 #include "game/ui/general/vehiclesheet.h"
+#include <algorithm>
 #include <array>
 
 namespace OpenApoc
@@ -80,6 +77,14 @@ void TransactionScreen::changeBase(sp<Base> newBase)
 	}
 	// Apply display type and base highlight
 	setDisplayType(type);
+}
+
+void TransactionScreen::restoreBase()
+{
+	if (state->current_base != prevBase)
+	{
+		this->changeBase(prevBase);
+	}
 }
 
 void TransactionScreen::setDisplayType(Type type)
@@ -476,7 +481,7 @@ void TransactionScreen::updateBaseHighlight()
 		int i = 0;
 		for (auto &b : state->player_bases)
 		{
-			auto viewName = format("BUTTON_BASE_%d", ++i);
+			auto viewName = format("BUTTON_BASE_{0}", ++i);
 			auto view = form->findControlTyped<GraphicButton>(viewName);
 			auto viewImage = drawMiniBase(*b.second, viewHighlight, viewFacility);
 			view->setImage(viewImage);
@@ -498,7 +503,7 @@ void TransactionScreen::updateBaseHighlight()
 			fillBaseBar(true, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_FIRST_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%.f%%", usage));
+			facilityLabel->setText(format("{0:.0f}%", usage));
 			break;
 		}
 		case BaseGraphics::FacilityHighlight::Stores:
@@ -512,7 +517,7 @@ void TransactionScreen::updateBaseHighlight()
 			fillBaseBar(true, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_FIRST_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%.f%%", usage));
+			facilityLabel->setText(format("{0:.0f}%", usage));
 			break;
 		}
 		case BaseGraphics::FacilityHighlight::Aliens:
@@ -526,7 +531,7 @@ void TransactionScreen::updateBaseHighlight()
 			fillBaseBar(true, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_FIRST_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%.f%%", usage));
+			facilityLabel->setText(format("{0:.0f}%", usage));
 			break;
 		}
 		default:
@@ -643,6 +648,7 @@ void TransactionScreen::attemptCloseScreen()
 {
 	if (isClosable())
 	{
+		restoreBase();
 		fw().stageQueueCommand({StageCmd::Command::POP});
 	}
 	else
@@ -650,8 +656,16 @@ void TransactionScreen::attemptCloseScreen()
 		fw().stageQueueCommand({StageCmd::Command::PUSH,
 		                        mksp<MessageBox>(
 		                            confirmClosureText, "", MessageBox::ButtonOptions::YesNoCancel,
-		                            [this] { closeScreen(); },
-		                            [] { fw().stageQueueCommand({StageCmd::Command::POP}); })});
+		                            [this]
+		                            {
+			                            restoreBase();
+			                            closeScreen();
+		                            },
+		                            [this]
+		                            {
+			                            restoreBase();
+			                            fw().stageQueueCommand({StageCmd::Command::POP});
+		                            })});
 	}
 }
 
@@ -660,6 +674,7 @@ void TransactionScreen::forcedCloseScreen()
 	// Forced means we already asked player to confirm some secondary thing
 	// (like there being no free ferries right now)
 	executeOrders();
+	restoreBase();
 	fw().stageQueueCommand({StageCmd::Command::POP});
 }
 
@@ -667,7 +682,7 @@ void TransactionScreen::initViewSecondBase()
 {
 	for (int i = 1; i <= MAX_BASES; i++)
 	{
-		auto viewName = format("BUTTON_SECOND_BASE_%d", i);
+		auto viewName = format("BUTTON_SECOND_BASE_{0}", i);
 		form->findControlTyped<GraphicButton>(viewName)->setVisible(false);
 	}
 	form->findControlTyped<Graphic>("FACILITY_SECOND_PIC")->setVisible(false);

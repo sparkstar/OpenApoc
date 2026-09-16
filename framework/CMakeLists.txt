@@ -1,9 +1,6 @@
 # project name, and type
 PROJECT(OpenApoc_Framework CXX C)
 
-# check cmake version
-CMAKE_MINIMUM_REQUIRED(VERSION 3.9)
-
 option(DIALOG_ON_ERROR "Pop up a dialog box showing errors" ON)
 
 
@@ -16,13 +13,11 @@ set (FRAMEWORK_SOURCE_FILES
 	image.cpp
 	jukebox.cpp
 	logger.cpp
-	luaframework.cpp
 	palette.cpp
 	physfs_fs.cpp
 	renderer.cpp
 	serialization/serialize.cpp
 	serialization/providers/filedataprovider.cpp
-	serialization/providers/providerwithchecksum.cpp
 	serialization/providers/zipdataprovider.cpp
 	sound.cpp
 	stagestack.cpp
@@ -48,27 +43,19 @@ set (FRAMEWORK_HEADER_FILES
 	jukebox.h
 	keycodes.h
 	logger.h
-	luaframework.h
 	musicloader_interface.h
 	palette.h
 	renderer.h
 	renderer_interface.h
 	sampleloader_interface.h
 	serialization/serialize.h
-	serialization/providers/filedataprovider.h
-	serialization/providers/providerwithchecksum.h
-	serialization/providers/zipdataprovider.h
-	serialization/providers/serializationdataprovider.h
 	sound.h
 	sound_interface.h
 	stage.h
 	stagestack.h
-	ThreadPool/ThreadPool.h
 	video.h
-	logger_sdldialog.h
-	logger_file.h
 	options.h
-	modinfo.h translation.h)
+	modinfo.h)
 
 source_group(framework\\headers FILES ${FRAMEWORK_HEADER_FILES})
 list(APPEND ALL_HEADER_FILES ${FRAMEWORK_HEADER_FILES})
@@ -216,7 +203,7 @@ endif()
 # We use boost::locale for utf conversions and boost::filesystem for
 # serialization
 
-set(BOOST_PACKAGES locale system program_options)
+set(BOOST_PACKAGES locale program_options)
 # Arbitrary version that I remember testing previously
 set(BOOST_VERSION 1.50)
 
@@ -260,9 +247,11 @@ endif()
 
 find_path(VORBIS_INCLUDE_DIR vorbis/vorbisfile.h)
 find_library(VORBISFILE_LIBRARY vorbisfile)
+find_library(VORBIS_LIBRARY vorbis)
+find_library(OGG_LIBRARY ogg)
 
 target_include_directories(OpenApoc_Framework PRIVATE ${VORBIS_INCLUDE_DIR})
-target_link_libraries(OpenApoc_Framework PRIVATE ${VORBISFILE_LIBRARY})
+target_link_libraries(OpenApoc_Framework PRIVATE ${VORBISFILE_LIBRARY} ${VORBIS_LIBRARY} ${OGG_LIBRARY})
 
 # Dialog is handled by SDL2
 if(DIALOG_ON_ERROR)
@@ -275,6 +264,7 @@ if (NOT OPENGL_FOUND)
 		message(WARNING "OpenGL not found for GL_2_0 renderer")
 else()
 	target_link_libraries(OpenApoc_Framework PUBLIC ${OPENGL_gl_LIBRARY})
+	target_link_libraries(OpenApoc_Framework PUBLIC ${OPENGL_glx_LIBRARY})
 	target_include_directories(OpenApoc_Framework PUBLIC ${OPENGL_INCLUDE_DIR})
 endif()
 target_link_libraries(OpenApoc_Framework PUBLIC OpenApoc_Library)
@@ -293,3 +283,7 @@ endif()
 target_include_directories(OpenApoc_Framework PRIVATE
 		${CMAKE_SOURCE_DIR}/dependencies/physfs/src)
 target_include_directories(OpenApoc_Framework PUBLIC ${CMAKE_SOURCE_DIR})
+
+if (USE_PCH)
+	target_precompile_headers(OpenApoc_Framework PUBLIC framework_pch.h)
+endif()

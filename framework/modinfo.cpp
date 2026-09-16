@@ -1,5 +1,6 @@
 #include "framework/modinfo.h"
 #include "dependencies/pugixml/src/pugixml.hpp"
+#include "framework/framework.h"
 #include "framework/logger.h"
 
 namespace OpenApoc
@@ -26,14 +27,14 @@ std::optional<ModInfo> ModInfo::getInfo(const UString &path)
 	auto parseResult = doc.load_file(filePath.c_str());
 	if (!parseResult)
 	{
-		LogWarning("Failed to parse ModInfo at \"%s\": %s at offset %u", filePath,
+		LogWarning("Failed to parse ModInfo at \"{0}\": {1} at offset {2}", filePath,
 		           parseResult.description(), parseResult.offset);
 		return {};
 	}
 	auto infoNode = doc.child("openapoc_modinfo");
 	if (!infoNode)
 	{
-		LogWarning("ModInfo at \"%s\" doesn't have an \"openapoc_modinfo\" root node", filePath);
+		LogWarning("ModInfo at \"{0}\" doesn't have an \"openapoc_modinfo\" root node", filePath);
 		return {};
 	}
 
@@ -46,7 +47,45 @@ std::optional<ModInfo> ModInfo::getInfo(const UString &path)
 	info.setDataPath(readNode("datapath", infoNode));
 	info.setStatePath(readNode("statepath", infoNode));
 	info.setMinVersion(readNode("minversion", infoNode));
-	info.setModLoadScript(readNode("modloadscript", infoNode));
+	auto difficultySubmodsNode = infoNode.child("difficulty_submods");
+	if (difficultySubmodsNode)
+	{
+		std::map<int, UString> submods;
+		for (const auto &node : difficultySubmodsNode.children("entry"))
+		{
+			auto diffAttr = node.attribute("difficulty");
+			if (!diffAttr)
+			{
+				LogWarning(
+				    "difficulty_submods entry in ModInfo at \"{0}\" missing 'difficulty' attribute",
+				    filePath);
+				continue;
+			}
+			const int difficulty = diffAttr.as_int(-1);
+			if (difficulty < 0)
+			{
+				LogWarning(
+				    "difficulty_submods entry in ModInfo at \"{0}\" has invalid difficulty \"{1}\"",
+				    filePath, diffAttr.value());
+				continue;
+			}
+			const UString path = node.text().get();
+			if (path.empty())
+			{
+				LogWarning("difficulty_submods entry for difficulty {0} in ModInfo at \"{1}\" has "
+				           "empty path",
+				           difficulty, filePath);
+				continue;
+			}
+			if (!submods.emplace(difficulty, path).second)
+			{
+				LogWarning("difficulty_submods in ModInfo at \"{0}\" has duplicate entry for "
+				           "difficulty {1}",
+				           filePath, difficulty);
+			}
+		}
+		info.setDifficultySubmods(std::move(submods));
+	}
 
 	auto requiresNode = infoNode.child("requires");
 	if (requiresNode)
@@ -71,7 +110,27 @@ std::optional<ModInfo> ModInfo::getInfo(const UString &path)
 	{
 		for (const auto node : languagesNode.children("entry"))
 		{
-			info.supported_languages.push_back(node.text().get());
+			ModLanguage lang;
+			auto nameNode = node.child("ID");
+			if (nameNode)
+			{
+				lang.ID = nameNode.text().get();
+			}
+			else
+			{
+				LogError("Language must at least have an ID");
+			}
+			auto patchNode = node.child("patch");
+			if (patchNode)
+			{
+				lang.patch = patchNode.text().get();
+			}
+			auto dataNode = node.child("data");
+			if (dataNode)
+			{
+				lang.data = dataNode.text().get();
+			}
+			info.supported_languages.push_back(lang);
 		}
 	}
 	return info;
@@ -90,7 +149,14 @@ bool ModInfo::writeInfo(const UString &path)
 	infoNode.append_child("datapath").text() = dataPath.c_str();
 	infoNode.append_child("statepath").text() = statePath.c_str();
 	infoNode.append_child("minversion").text() = minVersion.c_str();
-	infoNode.append_child("modloadscript").text() = modLoadScript.c_str();
+
+	auto difficultySubmodsNode = infoNode.append_child("difficulty_submods");
+	for (const auto &entry : difficultySubmods)
+	{
+		auto entryNode = difficultySubmodsNode.append_child("entry");
+		entryNode.append_attribute("difficulty").set_value(entry.first);
+		entryNode.text() = entry.second.c_str();
+	}
 
 	auto requiresNode = infoNode.append_child("requires");
 	for (const auto &requirement : _requirements)
@@ -106,17 +172,55 @@ bool ModInfo::writeInfo(const UString &path)
 	auto languagesNode = infoNode.append_child("languages");
 	for (const auto &language : supported_languages)
 	{
-		languagesNode.append_child("entry").text() = language.c_str();
+		auto langNode = languagesNode.append_child("entry");
+		langNode.append_child("ID").text() = language.ID.c_str();
+		langNode.append_child("patch").text() = language.patch.c_str();
+		langNode.append_child("data").text() = language.data.c_str();
 	}
 
 	auto filePath = path + "/modinfo.xml";
 	auto saveResult = doc.save_file(filePath.c_str());
 	if (!saveResult)
 	{
-		LogWarning("Failed to save ModInfo to \"%s\"", filePath);
+		LogWarning("Failed to save ModInfo to \"{0}\"", filePath);
 		return false;
 	}
 
 	return true;
+}
+
+std::optional<ModInfo::ModLanguage> getModLanguageInfo(const ModInfo &modInfo)
+{
+	const auto &language = fw().getLanguage();
+	const auto &country = fw().getLanguageCountry();
+
+	LogInfo("Looking for mod language matching {0}_{1}", language, country);
+
+	const auto &languages = modInfo.getSupportedLanguages();
+
+	// First try lang_country (e.g. en_GB). All supported languages are UTF-8
+	auto langID = format("{0}_{1}.UTF-8", language, country);
+	for (const auto lang : languages)
+	{
+		LogInfo("Checking {0}", lang.ID);
+		if (lang.ID == langID)
+		{
+			LogInfo("Found matching language");
+			return lang;
+		}
+	}
+
+	langID = format("{0}.UTF-8", language);
+	for (const auto lang : languages)
+	{
+		LogInfo("Checking {0}", lang.ID);
+		if (lang.ID == langID)
+		{
+			LogInfo("Found matching language");
+			return lang;
+		}
+	}
+
+	return {};
 }
 } // namespace OpenApoc

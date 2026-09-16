@@ -1,9 +1,6 @@
 # project name, and type
 PROJECT(OpenApoc_Library CXX C)
 
-# check cmake version
-CMAKE_MINIMUM_REQUIRED(VERSION 3.9)
-
 find_package(Boost REQUIRED COMPONENTS locale)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -46,6 +43,8 @@ if(NOT WIN32)
 	target_compile_definitions(OpenApoc_Library PUBLIC PTHREADS_AVAILABLE)
 endif()
 
+target_compile_definitions(OpenApoc_Library PUBLIC _USE_MATH_DEFINES)
+
 
 option(ENABLE_BACKTRACE "Enable gathering backtraces on some errors to aid debugging (Requires libunwind on linux, no extra dependencies on windows or macos)" ON)
 
@@ -75,3 +74,6 @@ if(ENABLE_BACKTRACE)
 	endif()
 endif()
 
+if (USE_PCH)
+	target_precompile_headers(OpenApoc_Library PUBLIC library_pch.h)
+endif()

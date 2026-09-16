@@ -5,9 +5,9 @@
 #include "game/state/stateobject.h"
 #include "game/state/tilemap/tile.h"
 #include "game/state/tilemap/tileobject.h"
-#include "library/colour.h"
 #include "library/rect.h"
 #include "library/sp.h"
+#include <list>
 #include <map>
 #include <set>
 #include <vector>
@@ -85,6 +85,7 @@ class TileMap
 	std::vector<std::set<TileObject::Type>> layerMap;
 
   public:
+	const static int MAX_ITERATION_LIMIT_DIRECT_FOR_BATTLE = 1000;
 	const bool isTileInBounds(int x, int y, int z) const
 	{
 		if (x < 0 || x >= size.x)
@@ -101,7 +102,7 @@ class TileMap
 
 		if (!((x >= 0) && (x < size.x) && (y >= 0) && (y < size.y) && (z >= 0) && (z < size.z)))
 		{
-			LogError("Incorrect tile coordinates (const) %d,%d,%d", x, y, z);
+			LogError("Incorrect tile coordinates (const) {0},{1},{2}", x, y, z);
 			return nullptr;
 		}
 		return &this->tiles[z * size.x * size.y + y * size.x + x];
@@ -110,7 +111,7 @@ class TileMap
 	{
 		if (!((x >= 0) && (x < size.x) && (y >= 0) && (y < size.y) && (z >= 0) && (z < size.z)))
 		{
-			LogError("Incorrect tile coordinates %d,%d,%d", x, y, z);
+			LogError("Incorrect tile coordinates {0},{1},{2}", x, y, z);
 			return nullptr;
 		}
 		return &this->tiles[z * size.x * size.y + y * size.x + x];

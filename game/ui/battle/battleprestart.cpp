@@ -2,12 +2,10 @@
 #include "forms/form.h"
 #include "forms/graphic.h"
 #include "forms/graphicbutton.h"
-#include "forms/label.h"
 #include "forms/ui.h"
 #include "framework/apocresources/cursor.h"
 #include "framework/data.h"
 #include "framework/event.h"
-#include "framework/font.h"
 #include "framework/framework.h"
 #include "framework/keycodes.h"
 #include "game/state/gamestate.h"
@@ -19,7 +17,6 @@
 #include "game/ui/general/agentsheet.h"
 #include "game/ui/general/loadingscreen.h"
 #include "game/ui/tileview/battleview.h"
-#include <cmath>
 
 namespace OpenApoc
 {
@@ -57,10 +54,8 @@ BattlePreStart::BattlePreStart(sp<GameState> state)
 
 	menuform->findControlTyped<GraphicButton>("BUTTON_EQUIP")
 	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [state](Event *) {
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<AEquipScreen>(state)});
-	        });
+	        FormEventType::ButtonClick, [state](Event *)
+	        { fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<AEquipScreen>(state)}); });
 	formAgentStats = menuform->findControlTyped<Form>("AGENT_STATS_VIEW");
 	formAgentProfile = menuform->findControlTyped<Form>("AGENT_PROFILE_VIEW");
 	formAgentStats->setVisible(false);
@@ -83,7 +78,7 @@ BattlePreStart::BattlePreStart(sp<GameState> state)
 	{
 		bigUnitRanks.push_back(
 		    fw().data->loadImage(format("PCK:xcom3/tacdata/tacbut.pck:xcom3/tacdata/"
-		                                "tacbut.tab:%d:xcom3/tacdata/tactical.pal",
+		                                "tacbut.tab:{0}:xcom3/tacdata/tactical.pal",
 		                                i)));
 	}
 }

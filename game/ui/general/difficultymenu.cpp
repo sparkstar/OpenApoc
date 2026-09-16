@@ -1,14 +1,9 @@
 #include "game/ui/general/difficultymenu.h"
 #include "forms/form.h"
 #include "forms/ui.h"
-#include "framework/configfile.h"
-#include "framework/data.h"
 #include "framework/event.h"
 #include "framework/framework.h"
 #include "framework/keycodes.h"
-#include "framework/modinfo.h"
-#include "framework/options.h"
-#include "game/state/city/city.h"
 #include "game/state/gamestate.h"
 #include "game/ui/general/loadingscreen.h"
 #include "game/ui/tileview/cityview.h"
@@ -85,17 +80,16 @@ void DifficultyMenu::eventOccurred(Event *e)
 		}
 		else
 		{
-			LogWarning("Unknown button pressed: %s", e->forms().RaisedBy->Name);
+			LogWarning("Unknown button pressed: {0}", e->forms().RaisedBy->Name);
 			return;
 		}
 
 		auto loadedState = mksp<GameState>();
 		loadedState->difficulty = difficulty;
 
-		fw().stageQueueCommand(
-		    {StageCmd::Command::PUSH,
-		     mksp<LoadingScreen>(nullptr, loadGame(loadedState),
-		                         [loadedState]() { return mksp<CityView>(loadedState); })});
+		fw().stageQueueCommand({StageCmd::Command::PUSH,
+		                        mksp<LoadingScreen>(nullptr, loadGame(loadedState), [loadedState]()
+		                                            { return mksp<CityView>(loadedState); })});
 		return;
 	}
 }

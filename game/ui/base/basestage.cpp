@@ -45,7 +45,7 @@ void BaseStage::begin()
 	for (auto &pair : state->player_bases)
 	{
 		auto &viewBase = pair.second;
-		auto viewName = format("BUTTON_BASE_%d", ++b);
+		auto viewName = format("BUTTON_BASE_{0}", ++b);
 		auto view = form->findControlTyped<GraphicButton>(viewName);
 		if (!view)
 		{
@@ -55,6 +55,7 @@ void BaseStage::begin()
 		if (state->current_base == viewBase)
 		{
 			currentView = view;
+			prevBase = viewBase;
 		}
 		view->setData(viewBase);
 		auto viewImage = drawMiniBase(*viewBase, viewHighlight, viewFacility);
@@ -88,6 +89,7 @@ void BaseStage::begin()
 	}
 	textViewBase = form->findControlTyped<Label>("TEXT_BUTTON_BASE");
 	this->textViewBase->setVisible(false);
+	this->update();
 }
 
 void BaseStage::render()

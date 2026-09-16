@@ -1,4 +1,5 @@
 #include "game/state/tilemap/tileobject_battlemappart.h"
+#include "framework/configfile.h"
 #include "framework/image.h"
 #include "framework/renderer.h"
 #include "game/state/battle/battlemappart.h"
@@ -65,7 +66,7 @@ TileObject::Type TileObjectBattleMapPart::convertType(BattleMapPartType::Type ty
 		case BattleMapPartType::Type::Feature:
 			return TileObject::Type::Feature;
 		default:
-			LogError("Unknown BattleMapPartType::Type %d", (int)type);
+			LogError("Unknown BattleMapPartType::Type {0}", (int)type);
 			return TileObject::Type::Ground;
 	}
 }
@@ -105,21 +106,30 @@ sp<BattleMapPart> TileObjectBattleMapPart::getOwner() const { return map_part; }
 
 sp<VoxelMap> TileObjectBattleMapPart::getVoxelMap(Vec3<int>, bool los) const
 {
+	auto owner = getOwner();
+	// Deliberate deviation from the original: a unit can already walk through a gravlift
+	// floor pad, so letting it block gunfire and vision as well is a design wart, not
+	// something worth preserving for faithfulness.
+	if (config().getBool("OpenApoc.NewFeature.GravliftLineOfFire") && owner->type->floor &&
+	    owner->type->gravlift)
+	{
+		return nullptr;
+	}
 	if (los)
 	{
-		if (getOwner()->falling)
+		if (owner->falling)
 		{
 			// Falling map parts do not break LOS
 			return nullptr;
 		}
 		else
 		{
-			return getOwner()->type->voxelMapLOS;
+			return owner->type->voxelMapLOS;
 		}
 	}
 	else
 	{
-		return getOwner()->type->voxelMapLOF;
+		return owner->type->voxelMapLOF;
 	}
 }
 
@@ -141,7 +151,7 @@ float TileObjectBattleMapPart::getZOrder() const
 			return z + (float)map_part->type->height / 40.0f / 2.0f - 14.0f;
 		}
 		default:
-			LogError("Impossible map part type %d", (int)type);
+			LogError("Impossible map part type {0}", (int)type);
 			return 0.0f;
 	}
 }

@@ -4,7 +4,6 @@
 #include "game/state/rules/city/vequipmenttype.h"
 #include "game/state/shared/equipment.h"
 #include "game/state/stateobject.h"
-#include "library/rect.h"
 #include "library/sp.h"
 #include "library/strings.h"
 #include "library/vec.h"
@@ -279,15 +278,22 @@ class VehicleType : public StateObject<VehicleType>
 		                           sp<VEquipmentType>>::value,
 		              "iterator must return sp<VehicleEquipmentType>");
 
-		// FIXME: This is somehow modulated by weight?
+		int weight = this->getWeight(first, last);
 		float speed = this->top_speed;
+		bool hasEngine = false;
 		while (first != last)
 		{
 			if ((*first)->type == EquipmentSlotType::VehicleEngine)
 			{
 				speed += (*first)->top_speed;
+				hasEngine = true;
 			}
 			++first;
+		}
+		// Light vehicles have +4 speed
+		if (weight < 350 && hasEngine)
+		{
+			speed += 4;
 		}
 		return speed;
 	}

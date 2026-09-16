@@ -10,12 +10,7 @@
 #include "game/state/rules/battle/battlecommonsamplelist.h"
 #include "game/state/rules/city/scenerytiletype.h"
 #include "game/state/shared/agent.h"
-#include "game/state/shared/doodad.h"
-#include "game/state/shared/organisation.h"
 #include "game/state/tilemap/tilemap.h"
-#include "game/state/tilemap/tileobject_doodad.h"
-#include "game/state/tilemap/tileobject_scenery.h"
-#include "game/state/tilemap/tileobject_shadow.h"
 #include "library/strings_format.h"
 #include <glm/glm.hpp>
 
@@ -53,12 +48,12 @@ bool AgentTileHelper::canEnterTile(Tile *from, Tile *to, bool, bool &, float &co
 	Vec3<int> toPos = to->position;
 	if (fromPos == toPos)
 	{
-		LogError("FromPos == ToPos %s", toPos);
+		LogError("FromPos == ToPos {0}", toPos);
 		return false;
 	}
 	if (!map.tileIsValid(toPos))
 	{
-		LogError("ToPos %s is not on the map", toPos);
+		LogError("ToPos {0} is not on the map", toPos);
 		return false;
 	}
 
@@ -437,12 +432,11 @@ void AgentMission::start(GameState &state, Agent &a)
 						StateRef<Building> closestBuilding;
 						for (auto &b : a.city->buildings)
 						{
-							auto distance =
-							    glm::length(a.position - (Vec3<float>)b.second->crewQuarters);
+							auto distance = glm::length(a.position - (Vec3<float>)b->crewQuarters);
 							if (distance < closestDistance)
 							{
 								distance = closestDistance;
-								closestBuilding = {&state, b.first};
+								closestBuilding = b;
 							}
 						}
 						a.enterBuilding(state, closestBuilding);
@@ -484,7 +478,7 @@ void AgentMission::setPathTo(GameState &state [[maybe_unused]], Agent &a, StateR
 	auto key = Vec3<int>{(Vec3<int>)a.position * map.size + b->crewQuarters};
 	if (map.agentPathCache.find(key) != map.agentPathCache.end())
 	{
-		LogWarning("Found cached path from %s to %s, using it", a.position, b->crewQuarters);
+		LogWarning("Found cached path from {0} to {1}, using it", a.position, b->crewQuarters);
 		path = map.agentPathCache[key];
 	}
 	else
@@ -583,7 +577,7 @@ UString AgentMission::getName()
 			name += " " + this->targetBuilding.id;
 			break;
 		case MissionType::Snooze:
-			name += format(" for %u ticks", this->timeToSnooze);
+			name += format(" for {0} ticks", this->timeToSnooze);
 			break;
 		case MissionType::Teleport:
 			name += " " + this->targetBuilding.id;

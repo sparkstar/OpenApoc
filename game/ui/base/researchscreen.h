@@ -3,7 +3,6 @@
 #include "game/state/stateobject.h"
 #include "game/ui/base/basestage.h"
 #include "library/sp.h"
-#include "library/vec.h"
 #include <list>
 
 namespace OpenApoc
@@ -30,8 +29,6 @@ class ResearchScreen : public BaseStage
 	void populateUILabList(const UString &listName, std::list<sp<Facility>> &list);
 	void setCurrentLabInfo();
 	void updateProgressInfo();
-
-	int assigned_agent_count;
 
 	sp<Graphic> arrow;
 

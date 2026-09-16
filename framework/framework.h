@@ -32,7 +32,7 @@ class Framework
 	up<FrameworkPrivate> p;
 	UString programName;
 	bool createWindow;
-	void audioInitialise();
+	void audioInitialise(bool headless);
 	void audioShutdown();
 
 	static Framework *instance;
@@ -40,6 +40,9 @@ class Framework
 	up<ApocCursor> cursor;
 
 	std::list<StageCmd> stageCommands;
+
+	UString language;
+	UString languageCountry;
 
   public:
 	std::unique_ptr<Data> data;
@@ -97,6 +100,8 @@ class Framework
 	void toolTipTimerCallback(unsigned int interval, void *data);
 	void showToolTip(sp<Image> image, const Vec2<int> &position);
 
+	void setMouseGrab();
+
 	UString textGetClipboard();
 
 	void threadPoolTaskEnqueue(std::function<void()> task);
@@ -125,6 +130,8 @@ class Framework
 	UString getCDPath() const;
 
 	void setupModDataPaths();
+	const UString &getLanguage() const { return this->language; };
+	const UString &getLanguageCountry() const { return this->languageCountry; };
 };
 
 static inline Framework &fw() { return Framework::getInstance(); }

@@ -1,11 +1,13 @@
 #include <QApplication>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QProcess>
 #include <QSize>
 #include <array>
 #include <string_view>
 #include <utility>
 
+#include "cddetect.h"
 #include "launcherwindow.h"
 #include "ui_launcherwindow.h"
 
@@ -18,12 +20,35 @@
 
 using namespace OpenApoc;
 
+// Runs the shared candidate scan + picker flow. Kept as a file-local free function (not a
+// LauncherWindow member) so it can safely be called before `ui` exists, in the ctor's startup
+// detection path.
+static QString resolveCDPath(QWidget *dialogParent, bool forceChooser)
+{
+	QStringList candidates = OpenApoc::CDDetect::detectCandidates();
+	if (candidates.isEmpty())
+	{
+		LogInfo("CD autodetect: no candidates found");
+		return {};
+	}
+	if (!forceChooser && candidates.size() == 1)
+	{
+		return candidates.first();
+	}
+	bool ok = false;
+	QString choice = QInputDialog::getItem(
+	    dialogParent, "Select X-COM: Apocalypse data source",
+	    "Found possible data source(s), pick one (Cancel to leave unchanged):", candidates, 0,
+	    false, &ok);
+	return (ok && !choice.isEmpty()) ? choice : QString();
+}
+
 static std::list<std::pair<UString, ModInfo>> enumerateMods()
 {
 	fs::path modPath = Options::modPath.get();
 	if (!fs::is_directory(modPath))
 	{
-		LogError("Mod path \"%s\" not a valid directory", modPath.string());
+		LogError("Mod path \"{0}\" not a valid directory", modPath.string());
 		return {};
 	}
 
@@ -61,14 +86,31 @@ LauncherWindow::LauncherWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 
 	config().parseOptions(1, &fake_argv);
 
+	// `ui` does not exist yet at this point in construction, so read/write the CD path option
+	// directly rather than through `ui->cdPath`.
+	const QString currentCD = QString::fromStdString(OpenApoc::Options::cdPathOption.get());
+	if (!OpenApoc::CDDetect::isPlausibleCDPath(currentCD))
+	{
+		const QString detected = resolveCDPath(this, /*forceChooser=*/false);
+		if (!detected.isEmpty())
+		{
+			OpenApoc::Options::cdPathOption.set(detected.toStdString());
+		}
+	}
+
 	this->currentFramework = mkup<OpenApoc::Framework>("OpenApoc_Launcher", false);
 	ui->setupUi(this);
+
+	QIcon icon;
+	icon.addFile("apocicon.ico");
+	this->setWindowIcon(icon);
 
 	connect(ui->exitButton, &QPushButton::clicked, this, &LauncherWindow::exit);
 	connect(ui->playButton, &QPushButton::clicked, this, &LauncherWindow::play);
 	connect(ui->browseCDFile, &QPushButton::clicked, this, &LauncherWindow::browseCDFile);
 	connect(ui->browseCDDir, &QPushButton::clicked, this, &LauncherWindow::browseCDDir);
 	connect(ui->browseDataDir, &QPushButton::clicked, this, &LauncherWindow::browseDataDir);
+	connect(ui->autodetectButton, &QPushButton::clicked, this, &LauncherWindow::onAutodetect);
 	connect(ui->resolutionBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this,
 	        &LauncherWindow::setResolutionSelection);
 
@@ -91,6 +133,7 @@ LauncherWindow::LauncherWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 	setupScaling();
 	setupScreenModes();
 	setupDisplayNum();
+	setupMouseCapture();
 
 	ui->cdPath->setText(QString::fromStdString(OpenApoc::Options::cdPathOption.get()));
 	ui->dataPath->setText(QString::fromStdString(OpenApoc::Options::dataPathOption.get()));
@@ -315,6 +358,12 @@ void LauncherWindow::setLanguageSelection(int index)
 	selectedLanguageID = ui->languageBox->itemData(index).toString().toStdString();
 }
 
+void LauncherWindow::setupMouseCapture()
+{
+	auto &checkBox = *ui->mouseCaptureCheckBox;
+	checkBox.setChecked(Options::mouseCaptureOption.get());
+}
+
 void LauncherWindow::saveConfig()
 {
 	saveScalingOptions();
@@ -343,6 +392,7 @@ void LauncherWindow::saveConfig()
 	OpenApoc::Options::cdPathOption.set(ui->cdPath->text().toStdString());
 	OpenApoc::Options::dataPathOption.set(ui->dataPath->text().toStdString());
 	OpenApoc::Options::languageOption.set(selectedLanguageID);
+	OpenApoc::Options::mouseCaptureOption.set(ui->mouseCaptureCheckBox->isChecked());
 	OpenApoc::config().save();
 	this->rebuildModList();
 }
@@ -358,7 +408,7 @@ void LauncherWindow::play()
 	QString path = QCoreApplication::applicationDirPath() + "/OpenApoc";
 #endif
 
-	LogWarning("Running \"%s\"", path.toStdString());
+	LogWarning("Running \"{0}\"", path.toStdString());
 	const auto ret = QProcess::startDetached(path, {});
 	if (!ret)
 	{
@@ -404,6 +454,17 @@ void LauncherWindow::browseDataDir()
 	}
 
 	ui->dataPath->setText(newPath);
+}
+
+void LauncherWindow::onAutodetect()
+{
+	// Always show the picker, even for a single candidate, since this is a deliberate,
+	// user-initiated rerun (unlike the silent startup autodetect).
+	const QString detected = resolveCDPath(this, /*forceChooser=*/true);
+	if (!detected.isEmpty())
+	{
+		ui->cdPath->setText(detected);
+	}
 }
 
 void LauncherWindow::exit()
@@ -498,7 +559,7 @@ void LauncherWindow::showModInfo(const ModInfo &info)
 	ui->modVersion->setText(QString::fromStdString(info.getVersion()));
 	ui->modDescription->setText(QString::fromStdString(info.getDescription()));
 
-	auto linkText = format("<a href=\"%s\">%s</a>", info.getLink(), info.getLink());
+	auto linkText = format("<a href=\"{0}\">{0}</a>", info.getLink());
 
 	ui->modLink->setText(QString::fromStdString(linkText));
 }
@@ -622,8 +683,9 @@ void LauncherWindow::updateAvailableLanguages()
 		{
 			if (modDir == enabledModName)
 			{
-				for (const auto &languageID : modInfo.getSupportedLanguages())
+				for (const auto &language : modInfo.getSupportedLanguages())
 				{
+					const auto languageID = language.ID;
 					ui->languageBox->addItem(getLanguageName(languageID),
 					                         QString::fromStdString(languageID));
 					if (selectedLanguageID == languageID)

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "framework/configfile.h"
 
 namespace OpenApoc::Options
@@ -16,13 +18,13 @@ extern ConfigOptionInt audioMusicGainOption;
 extern ConfigOptionInt audioConcurrentSampleCount;
 extern ConfigOptionInt screenWidthOption;
 extern ConfigOptionInt screenHeightOption;
-extern ConfigOptionBool screenFullscreenOption;
 extern ConfigOptionString screenModeOption;
 extern ConfigOptionInt screenDisplayNumberOption;
 extern ConfigOptionInt screenScaleXOption;
 extern ConfigOptionInt screenScaleYOption;
 extern ConfigOptionBool screenAutoScale;
 extern ConfigOptionString languageOption;
+extern ConfigOptionBool mouseCaptureOption;
 
 extern ConfigOptionInt frameLimit;
 extern ConfigOptionInt targetFPS;
@@ -32,7 +34,6 @@ extern ConfigOptionBool autoScrollOption;
 extern ConfigOptionBool actionMusicOption;
 extern ConfigOptionBool autoExecuteOption;
 extern ConfigOptionInt toolTipDelay;
-extern ConfigOptionBool vanillaToggle;
 
 extern ConfigOptionBool optionPauseOnUfoSpotted;
 extern ConfigOptionBool optionPauseOnVehicleLightDamage;
@@ -79,6 +80,7 @@ extern ConfigOptionBool optionInstantExplosionDamage;
 extern ConfigOptionBool optionGravliftSounds;
 extern ConfigOptionBool optionNoScrollSounds;
 extern ConfigOptionBool optionNoInstantThrows;
+extern ConfigOptionBool optionGravliftLineOfFire;
 extern ConfigOptionBool optionFerryChecksRelationshipWhenBuying;
 extern ConfigOptionBool optionAllowManualCityTeleporters;
 extern ConfigOptionBool optionAllowManualCargoFerry;
@@ -88,7 +90,6 @@ extern ConfigOptionBool optionPayloadExplosion;
 extern ConfigOptionBool optionDisplayUnitPaths;
 extern ConfigOptionBool optionAdditionalUnitIcons;
 extern ConfigOptionBool optionAllowForceFiringParallel;
-extern ConfigOptionBool optionRequireLOSToMaintainPsi;
 extern ConfigOptionBool optionAllowAttackingOwnedVehicles;
 extern ConfigOptionBool optionCallExistingFerry;
 extern ConfigOptionBool optionAlternateVehicleShieldSound;
@@ -119,18 +120,12 @@ extern ConfigOptionFloat optionSceneryRepairCostFactor;
 extern ConfigOptionBool optionLoadSameAmmo;
 extern ConfigOptionBool optionShowCurrentDimensionVehicles;
 extern ConfigOptionBool optionShowNonXCOMVehiclesPrefix;
+extern ConfigOptionBool isoOnlyFollow;
+extern ConfigOptionBool formatAsCurrency;
 
 extern ConfigOptionBool optionStunHostileAction;
 extern ConfigOptionBool optionRaidHostileAction;
-extern ConfigOptionBool optionBSKLauncherSound;
 extern ConfigOptionBool optionInvulnerableRoads;
-extern ConfigOptionBool optionATVTank;
-
-extern ConfigOptionBool optionATVAPC;
-
-extern ConfigOptionBool optionCrashingVehicles;
-
-extern ConfigOptionString optionScriptsList;
 
 extern ConfigOptionBool optionInfiniteAmmoCheat;
 extern ConfigOptionFloat optionDamageInflictedMultiplierCheat;
@@ -152,12 +147,6 @@ extern ConfigOptionInt backtraceLogLevelOption;
 extern ConfigOptionInt dialogLogLevelOption;
 
 extern ConfigOptionString defaultTooltipFont;
-
-extern ConfigOptionBool useCRCChecksum;
-extern ConfigOptionBool useSHA1Checksum;
-
-extern ConfigOptionBool enableTrace;
-extern ConfigOptionString traceFile;
 
 extern ConfigOptionString saveDirOption;
 extern ConfigOptionBool packSaveOption;

@@ -3,13 +3,11 @@
 #include "forms/graphicbutton.h"
 #include "forms/label.h"
 #include "forms/multilistbox.h"
-#include "forms/scrollbar.h"
 #include "forms/ui.h"
 #include "framework/configfile.h"
 #include "framework/data.h"
 #include "framework/font.h"
 #include "framework/framework.h"
-#include "framework/logger.h"
 #include "game/state/battle/battle.h"
 #include "game/state/battle/battleunit.h"
 #include "game/state/city/base.h"
@@ -17,13 +15,9 @@
 #include "game/state/city/city.h"
 #include "game/state/city/facility.h"
 #include "game/state/city/vehicle.h"
-#include "game/state/city/vequipment.h"
 #include "game/state/gamestate.h"
-#include "game/state/rules/aequipmenttype.h"
 #include "game/state/rules/city/facilitytype.h"
-#include "game/state/rules/city/vammotype.h"
 #include "game/state/rules/city/vehicletype.h"
-#include "game/state/rules/city/vequipmenttype.h"
 #include "game/state/shared/agent.h"
 
 namespace OpenApoc
@@ -41,10 +35,10 @@ void ControlGenerator::init(GameState &state [[maybe_unused]])
 	{
 		battleSelect.push_back(
 		    fw().data->loadImage(format("PCK:xcom3/tacdata/tacbut.pck:xcom3/tacdata/"
-		                                "tacbut.tab:%d:xcom3/tacdata/tactical.pal",
+		                                "tacbut.tab:{0}:xcom3/tacdata/tactical.pal",
 		                                25 + i)));
 		citySelect.push_back(fw().data->loadImage(format(
-		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:%d:xcom3/ufodata/pal_01.dat",
+		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:{0}:xcom3/ufodata/pal_01.dat",
 		    37 + i)));
 	}
 
@@ -56,7 +50,7 @@ void ControlGenerator::init(GameState &state [[maybe_unused]])
 	{
 		unitRanks.push_back(
 		    fw().data->loadImage(format("PCK:xcom3/tacdata/tacbut.pck:xcom3/tacdata/"
-		                                "tacbut.tab:%d:xcom3/tacdata/tactical.pal",
+		                                "tacbut.tab:{0}:xcom3/tacdata/tactical.pal",
 		                                i)));
 	}
 
@@ -86,7 +80,7 @@ void ControlGenerator::init(GameState &state [[maybe_unused]])
 	for (int i = 47; i <= 50; i++)
 	{
 		icons.push_back(fw().data->loadImage(format(
-		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:%d:xcom3/ufodata/pal_01.dat",
+		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:{0}:xcom3/ufodata/pal_01.dat",
 		    i)));
 	}
 
@@ -94,7 +88,7 @@ void ControlGenerator::init(GameState &state [[maybe_unused]])
 	for (int i = 51; i <= 63; i++)
 	{
 		vehiclePassengerCountIcons.push_back(fw().data->loadImage(format(
-		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:%d:xcom3/ufodata/pal_01.dat",
+		    "PCK:xcom3/ufodata/vs_icon.pck:xcom3/ufodata/vs_icon.tab:{0}:xcom3/ufodata/pal_01.dat",
 		    i)));
 	}
 	labelFont = ui().getFont("smalfont");
@@ -602,7 +596,7 @@ sp<Control> ControlGenerator::createLargeAgentControl(GameState &state, const Ag
 	if (skill != UnitSkillState::Hidden)
 	{
 		auto skillLabel = baseControl->createChild<Label>(
-		    format(tr("Skill %d"), info.agent->getSkill()), singleton.labelFont);
+		    format(tr("Skill {0}"), info.agent->getSkill()), singleton.labelFont);
 		skillLabel->Tint = {192, 192, 192};
 
 		skillLabel->Size = {nameLabel->Size.x, singleton.labelFont->getFontHeight()};
@@ -693,6 +687,15 @@ OrganisationInfo ControlGenerator::createOrganisationInfo(GameState &state, sp<O
 	return i;
 }
 
+OrganisationInfo ControlGenerator::createLargeOrganisationInfo(GameState &state,
+                                                               sp<Organisation> org)
+{
+	auto i = OrganisationInfo();
+	i.organisation = org;
+	i.selected = org->infiltrationSelected;
+	return i;
+}
+
 sp<Control> ControlGenerator::createOrganisationControl(GameState &state,
                                                         const OrganisationInfo &info)
 {
@@ -713,9 +716,38 @@ sp<Control> ControlGenerator::createOrganisationControl(GameState &state,
 	orgIcon->AutoSize = true;
 	orgIcon->Location = {1, 1};
 	orgIcon->Name = "ORG_ICON_" + info.organisation->name;
-	orgIcon->ToolTipText = tr(info.organisation->name);
+	orgIcon->ToolTipText = info.organisation->name;
 
 	return baseControl;
+}
+
+sp<Control> ControlGenerator::createLargeOrganisationControl(GameState &state,
+                                                             const OrganisationInfo &info)
+{
+	if (!singleton.initialised)
+	{
+		singleton.init(state);
+	}
+	auto frame = singleton.citySelect[info.selected ? 2 : 0];
+	auto baseControl = mksp<Graphic>(frame);
+	baseControl->setData(info.organisation);
+	baseControl->Size = {140, singleton.labelFont->getFontHeight() * 2};
+
+	auto orgIcon = baseControl->createChild<Graphic>(info.organisation->icon);
+	orgIcon->AutoSize = true;
+	orgIcon->Location = {1, 1};
+
+	auto orgLabel = baseControl->createChild<Label>(info.organisation->name, singleton.labelFont);
+	orgLabel->Location = {40, 3};
+	orgLabel->Size = {baseControl->Size.x, singleton.labelFont->getFontHeight() * 2};
+
+	return baseControl;
+}
+
+sp<Control> ControlGenerator::createLargeOrganisationControl(GameState &state, sp<Organisation> org)
+{
+	auto i = createLargeOrganisationInfo(state, org);
+	return createLargeOrganisationControl(state, i);
 }
 
 sp<Control> ControlGenerator::createOrganisationControl(GameState &state, sp<Organisation> org)

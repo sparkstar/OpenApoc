@@ -1,8 +1,8 @@
 #pragma once
 
-#include "game/state/battle/ai/aitype.h"
 #include "game/state/battle/ai/tacticalai.h"
 #include "game/state/battle/battleforces.h"
+#include "game/state/city/base.h"
 #include "game/state/gametime.h"
 #include "game/state/rules/agenttype.h"
 #include "game/state/rules/battle/battlemapsector.h"
@@ -131,7 +131,8 @@ class Battle : public std::enable_shared_from_this<Battle>
 	// - Map part which is door opening/closing
 	std::set<Vec3<int>> tilesChangedForVision;
 	MissionType mission_type = MissionType::AlienExtermination;
-	UString mission_location_id;
+	StateRef<Building> mission_location_building;
+	StateRef<Vehicle> mission_location_vehicle;
 	Mode mode = Mode::RealTime;
 	BattleScore score = {};
 	unsigned missionEndTimer = 0;
@@ -328,6 +329,15 @@ class Battle : public std::enable_shared_from_this<Battle>
 	// To be called after battle was finished and before returning to cityscape
 	static void exitBattle(GameState &state);
 
+	// Get list of player vehicles in battle
+	static const std::list<StateRef<Vehicle>> getPlayerVehicles(GameState &state);
+
+	// Check if cargo carrier is present at player vehicles list
+	static const bool isCargoCarrierPresent(const std::list<StateRef<Vehicle>> &playerVehicles);
+
+	// Check if bio carrier is present at player vehicles list
+	static const bool isBioCarrierPresent(const std::list<StateRef<Vehicle>> &playerVehicles);
+
 	// Pathfinding functions
 
   public:
@@ -350,6 +360,13 @@ class Battle : public std::enable_shared_from_this<Battle>
 	    Vec3<int> origin, Vec3<int> destination, const BattleUnitTileHelper &canEnterTile,
 	    bool approachOnly = false, bool ignoreStaticUnits = false, bool ignoreMovingUnits = true,
 	    bool ignoreAllUnits = false, float *cost = nullptr, float maxCost = 0.0f);
+
+	// Returns defended base if mission is base defense, returns null otherwise
+	static sp<Base> getCurrentDefendedBase(GameState &state);
+
+	// Check if mission is base defense and has storage for specified capacity type
+	static bool isBaseDefenseWithStorage(GameState &state,
+	                                     const FacilityType::Capacity capacityType);
 
   private:
 	void loadResources(GameState &state);

@@ -4,7 +4,6 @@
 #include "game/ui/boot.h"
 #include "forms/ui.h"
 #include "framework/configfile.h"
-#include "framework/data.h"
 #include "framework/framework.h"
 #include "framework/jukebox.h"
 #include "framework/modinfo.h"
@@ -15,7 +14,6 @@
 #include "game/ui/general/videoscreen.h"
 #include "game/ui/tileview/battleview.h"
 #include "game/ui/tileview/cityview.h"
-#include <cmath>
 
 namespace OpenApoc
 {
@@ -60,11 +58,11 @@ void BootUp::update()
 		    {
 			    auto &ui_instance = ui();
 			    std::ignore = ui_instance;
-			    LogWarning("Loading save \"%s\"", path);
+			    LogWarning("Loading save \"{0}\"", path);
 
 			    if (!loadedState->loadGame(path))
 			    {
-				    LogError("Failed to load supplied game \"%s\"", path);
+				    LogError("Failed to load supplied game \"{0}\"", path);
 			    }
 			    loadedState->initState();
 		    });

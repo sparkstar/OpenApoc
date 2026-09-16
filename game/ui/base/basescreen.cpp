@@ -60,19 +60,19 @@ void BaseScreen::begin()
 	selGraphic = form->findControlTyped<Graphic>("GRAPHIC_SELECTED_FACILITY");
 	for (int i = 0; i < 3; i++)
 	{
-		auto labelName = format("LABEL_%d", i + 1);
+		auto labelName = format("LABEL_{0}", i + 1);
 		auto label = form->findControlTyped<Label>(labelName);
 		if (!label)
 		{
-			LogError("Failed to find UI control matching \"%s\"", labelName);
+			LogError("Failed to find UI control matching \"{0}\"", labelName);
 		}
 		statsLabels.push_back(label);
 
-		auto valueName = format("VALUE_%d", i + 1);
+		auto valueName = format("VALUE_{0}", i + 1);
 		auto value = form->findControlTyped<Label>(valueName);
 		if (!value)
 		{
-			LogError("Failed to find UI control matching \"%s\"", valueName);
+			LogError("Failed to find UI control matching \"{0}\"", valueName);
 		}
 		statsValues.push_back(value);
 	}
@@ -90,22 +90,19 @@ void BaseScreen::begin()
 		graphic->Name = "FACILITY_BUILD_TILE";
 		facilities->addItem(graphic);
 	}
+	facilities->update();
 
 	form->findControlTyped<GraphicButton>("BUTTON_OK")
 	    ->addCallback(FormEventType::ButtonClick,
 	                  [](Event *) { fw().stageQueueCommand({StageCmd::Command::POP}); });
 	form->findControlTyped<GraphicButton>("BUTTON_BASE_BUYSELL")
 	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *) {
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<BuyAndSellScreen>(state)});
-	        });
+	        FormEventType::ButtonClick, [this](Event *)
+	        { fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<BuyAndSellScreen>(state)}); });
 	form->findControlTyped<GraphicButton>("BUTTON_BASE_HIREFIRESTAFF")
 	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *) {
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<RecruitScreen>(state)});
-	        });
+	        FormEventType::ButtonClick, [this](Event *)
+	        { fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<RecruitScreen>(state)}); });
 	form->findControlTyped<GraphicButton>("BUTTON_BASE_TRANSFER")
 	    ->addCallback(
 	        FormEventType::ButtonClick,
@@ -130,7 +127,15 @@ void BaseScreen::begin()
 	        FormEventType::ButtonClick,
 	        [this](Event *)
 	        {
-		        if (this->state->current_base->containmentEmpty(*state))
+		        if (!this->state->current_base->alienContainmentExists())
+		        {
+			        fw().stageQueueCommand(
+			            {StageCmd::Command::PUSH,
+			             mksp<MessageBox>(tr("Alien Containment"),
+			                              tr("Alien Containment does not exist at this base."),
+			                              MessageBox::ButtonOptions::Ok)});
+		        }
+		        else if (this->state->current_base->alienContainmentIsEmpty(*state))
 		        {
 			        fw().stageQueueCommand(
 			            {StageCmd::Command::PUSH,
@@ -145,54 +150,54 @@ void BaseScreen::begin()
 		        }
 	        });
 	form->findControlTyped<GraphicButton>("BUTTON_BASE_EQUIPAGENT")
-	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *)
-	        {
-		        bool playerHasSoldiers = false;
-		        for (auto &a : this->state->agents)
-		        {
-			        auto agent = a.second;
-			        if (agent->owner == this->state->getPlayer() &&
-			            agent->type->role == AgentType::Role::Soldier)
-			        {
-				        playerHasSoldiers = true;
-				        break;
-			        }
-		        }
-		        if (playerHasSoldiers)
-		        {
-			        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<AEquipScreen>(state)});
-		        }
-	        });
+	    ->addCallback(FormEventType::ButtonClick,
+	                  [this](Event *)
+	                  {
+		                  bool playerHasSoldiers = false;
+		                  for (auto &a : this->state->agents)
+		                  {
+			                  auto agent = a.second;
+			                  if (agent->owner == this->state->getPlayer() &&
+			                      agent->type->role == AgentType::Role::Soldier)
+			                  {
+				                  playerHasSoldiers = true;
+				                  break;
+			                  }
+		                  }
+		                  if (playerHasSoldiers)
+		                  {
+			                  fw().stageQueueCommand(
+			                      {StageCmd::Command::PUSH, mksp<AEquipScreen>(state)});
+		                  }
+	                  });
 	form->findControlTyped<GraphicButton>("BUTTON_BASE_EQUIPVEHICLE")
-	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *)
-	        {
-		        bool playerHasVehicles = false;
-		        for (auto &v : this->state->vehicles)
-		        {
-			        auto vehicle = v.second;
-			        if (vehicle->owner == this->state->getPlayer())
-			        {
-				        playerHasVehicles = true;
-				        break;
-			        }
-		        }
-		        if (playerHasVehicles)
-		        {
-			        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<VEquipScreen>(state)});
-		        }
-	        });
+	    ->addCallback(FormEventType::ButtonClick,
+	                  [this](Event *)
+	                  {
+		                  bool playerHasVehicles = false;
+		                  for (auto &v : this->state->vehicles)
+		                  {
+			                  auto vehicle = v.second;
+			                  if (vehicle->owner == this->state->getPlayer())
+			                  {
+				                  playerHasVehicles = true;
+				                  break;
+			                  }
+		                  }
+		                  if (playerHasVehicles)
+		                  {
+			                  fw().stageQueueCommand(
+			                      {StageCmd::Command::PUSH, mksp<VEquipScreen>(state)});
+		                  }
+	                  });
 	form->findControlTyped<GraphicButton>("BUTTON_BASE_RES_AND_MANUF")
-	    ->addCallback(
-	        FormEventType::ButtonClick,
-	        [this](Event *)
-	        {
-		        // FIXME: If you don't have any facilities this button should do nothing
-		        fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<ResearchScreen>(state)});
-	        });
+	    ->addCallback(FormEventType::ButtonClick,
+	                  [this](Event *)
+	                  {
+		                  // FIXME: If you don't have any facilities this button should do nothing
+		                  fw().stageQueueCommand(
+		                      {StageCmd::Command::PUSH, mksp<ResearchScreen>(state)});
+	                  });
 	// Base name edit
 	form->findControlTyped<TextEdit>("TEXT_BASE_NAME")
 	    ->addCallback(FormEventType::TextEditFinish,
@@ -212,7 +217,11 @@ void BaseScreen::begin()
 
 void BaseScreen::pause() {}
 
-void BaseScreen::resume() { textFunds->setText(state->getPlayerBalance()); }
+void BaseScreen::resume()
+{
+	BaseStage::begin();
+	textFunds->setText(state->getPlayerBalance());
+}
 
 void BaseScreen::finish() {}
 
@@ -329,9 +338,9 @@ void BaseScreen::eventOccurred(Event *e)
 				{
 					for (auto &cat : this->state->ufopaedia)
 					{
-						for (auto &entry : cat.second->entries)
+						for (auto &entryRef : cat.second->entries)
 						{
-							if (ufopaedia_entry == entry.second)
+							if (ufopaedia_entry == entryRef)
 							{
 								ufopaedia_category = cat.second;
 								break;
@@ -342,7 +351,7 @@ void BaseScreen::eventOccurred(Event *e)
 					}
 					if (!ufopaedia_category)
 					{
-						LogError("No UFOPaedia category found for entry %s",
+						LogError("No UFOPaedia category found for entry {0}",
 						         ufopaedia_entry->title);
 					}
 					fw().stageQueueCommand(
@@ -430,7 +439,8 @@ void BaseScreen::eventOccurred(Event *e)
 						case Base::BuildError::Occupied:
 							fw().stageQueueCommand(
 							    {StageCmd::Command::PUSH,
-							     mksp<MessageBox>(tr("Facility in use"), tr(""),
+							     mksp<MessageBox>(tr("Facility in use"),
+							                      tr("Cannot demolish this facility."),
 							                      MessageBox::ButtonOptions::Ok)});
 						default:
 							break;
@@ -453,33 +463,33 @@ void BaseScreen::eventOccurred(Event *e)
 	}
 	if (dragFacility)
 	{
-		selText->setText(tr(dragFacility->name));
+		selText->setText(dragFacility->name);
 		selGraphic->setImage(dragFacility->sprite);
 		statsLabels[0]->setText(tr("Cost to build"));
-		statsValues[0]->setText(format("$%d", dragFacility->buildCost));
+		statsValues[0]->setText(format("${0}", state->formatCurrency(dragFacility->buildCost)));
 		statsLabels[1]->setText(tr("Days to build"));
-		statsValues[1]->setText(format("%d", dragFacility->buildTime));
+		statsValues[1]->setText(format("{0}", dragFacility->buildTime));
 		statsLabels[2]->setText(tr("Maintenance cost"));
-		statsValues[2]->setText(format("$%d", dragFacility->weeklyCost));
+		statsValues[2]->setText(format("${0}", state->formatCurrency(dragFacility->weeklyCost)));
 	}
 	else if (selFacility != nullptr)
 	{
-		selText->setText(tr(selFacility->type->name));
+		selText->setText(selFacility->type->name);
 		selGraphic->setImage(selFacility->type->sprite);
 		if (selFacility->type->capacityAmount > 0)
 		{
 			statsLabels[0]->setText(tr("Capacity"));
-			statsValues[0]->setText(format("%d", selFacility->type->capacityAmount));
+			statsValues[0]->setText(format("{0}", selFacility->type->capacityAmount));
 			statsLabels[1]->setText(tr("Usage"));
 			statsValues[1]->setText(
-			    format("%.f%%", state->current_base->getUsage(*state, selFacility)));
+			    format("{0:.0f}%", state->current_base->getUsage(*state, selFacility)));
 		}
 	}
 	else if (selection != NO_SELECTION)
 	{
 		int sprite = BaseGraphics::getCorridorSprite(*state->current_base, selection);
 		auto image = format(
-		    "PCK:xcom3/ufodata/base.pck:xcom3/ufodata/base.tab:%d:xcom3/ufodata/base.pcx", sprite);
+		    "PCK:xcom3/ufodata/base.pck:xcom3/ufodata/base.tab:{0}:xcom3/ufodata/base.pcx", sprite);
 		if (sprite != 0)
 		{
 			selText->setText(tr("Corridor"));

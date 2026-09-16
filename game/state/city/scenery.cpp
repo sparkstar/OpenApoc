@@ -3,7 +3,6 @@
 #include "framework/framework.h"
 #include "framework/logger.h"
 #include "framework/sound.h"
-#include "game/state/city/agentmission.h"
 #include "game/state/city/building.h"
 #include "game/state/city/city.h"
 #include "game/state/city/vehicle.h"
@@ -853,7 +852,7 @@ bool Scenery::findSupport(bool allowClinging)
 								}
 								if (!mp)
 								{
-									LogError("Map part disappeared? %d %d %d", x, y, z);
+									LogError("Map part disappeared? {0} {1} {2}", x, y, z);
 									return false;
 								}
 							}
@@ -910,7 +909,7 @@ bool Scenery::findSupport(bool allowClinging)
 								}
 								if (!mp)
 								{
-									LogError("Map part disappeared? %d %d %d", x, y, z);
+									LogError("Map part disappeared? {0} {1} {2}", x, y, z);
 									return false;
 								}
 							}
@@ -961,8 +960,8 @@ bool Scenery::findSupport(bool allowClinging)
 				} // for every connected way
 				return true;
 			} // if connected to more than one way
-		}     // if more than 2 ways to connect to
-	}         // If road or tube
+		} // if more than 2 ways to connect to
+	} // If road or tube
 
 	// Step 04.02: With generals, we can shoot in x or in y, but connect only to hard support
 	//			   We also do not re-try support when lost
@@ -1058,7 +1057,7 @@ bool Scenery::findSupport(bool allowClinging)
 					}
 					if (!mp)
 					{
-						LogError("Map part disappeared? %d %d %d", x, y, z);
+						LogError("Map part disappeared? {0} {1} {2}", x, y, z);
 						return false;
 					}
 					mp->supportedParts.insert(lastMp->currentPosition);
@@ -1092,7 +1091,7 @@ bool Scenery::findSupport(bool allowClinging)
 			} // for every connected way
 			return true;
 		} // for every list of increments (vertical and horizontal)
-	}     // If general
+	} // If general
 
 	// If we didn't succeed, don't clear supportedBy!
 	// supportedBy = lastSupportedBy;
@@ -1142,7 +1141,7 @@ UString Scenery::getId() const { return type.id; }
 
 int Scenery::getType() const { return (int)0; }
 
-UString Scenery::getSupportString() const { return format("%d", supportHardness); }
+UString Scenery::getSupportString() const { return format("{0}", supportHardness); }
 
 void Scenery::setPosition(const Vec3<float> &pos)
 {
@@ -1168,22 +1167,7 @@ void Scenery::updateRelationWithAttacker(GameState &state, StateRef<Organisation
 	// Killing scenery is 4x as influential
 	float multiplier = killed ? 4.0f : 1.0f;
 	// Lose 5 points
-	ourOrg->adjustRelationTo(state, attackerOrg, -5.0f * multiplier);
-	// Our allies lose 2.5 points, enemies gain 1 point
-	for (auto &org : state.organisations)
-	{
-		if (org.first != attackerOrg.id && org.first != state.getCivilian().id)
-		{
-			if (org.second->isRelatedTo(ourOrg) == Organisation::Relation::Hostile)
-			{
-				org.second->adjustRelationTo(state, attackerOrg, 1.0f * multiplier);
-			}
-			else if (org.second->isRelatedTo(ourOrg) == Organisation::Relation::Allied)
-			{
-				org.second->adjustRelationTo(state, attackerOrg, -2.5f * multiplier);
-			}
-		}
-	}
+	ourOrg->adjustRelationTo(state, attackerOrg, -5.0f * multiplier, true);
 }
 
 bool Scenery::handleCollision(GameState &state, Collision &c)
@@ -1333,9 +1317,12 @@ void Scenery::die(GameState &state, bool forced)
 		}
 		this->tileObject->removeFromMap();
 		this->tileObject.reset();
-		state.totalScore.cityDamage -= type->value;
-		state.weekScore.cityDamage -= type->value;
 		this->destroyed = true;
+		if (city.id != "CITYMAP_ALIEN")
+		{
+			state.totalScore.cityDamage -= type->value;
+			state.weekScore.cityDamage -= type->value;
+		}
 		return;
 	}
 	if (!forced && type->damagedTile)
@@ -1412,8 +1399,11 @@ void Scenery::die(GameState &state, bool forced)
 		{
 			building->buildingPartChange(state, initialPosition, false);
 		}
-		state.totalScore.cityDamage -= type->value;
-		state.weekScore.cityDamage -= type->value;
+		if (city.id != "CITYMAP_ALIEN")
+		{
+			state.totalScore.cityDamage -= type->value;
+			state.weekScore.cityDamage -= type->value;
+		}
 	}
 }
 
@@ -1428,11 +1418,11 @@ void Scenery::collapse(GameState &state)
 	if (this->initialPosition.z <= 1)
 	{
 		this->damaged = true;
-		LogWarning("Scenery at %s  type %s can't fall as below 2", currentPosition, type.id);
+		LogWarning("Scenery at {0}  type {1} can't fall as below 2", currentPosition, type.id);
 	}
 	else
 	{
-		LogWarning("Scenery at %s type %s now falling", currentPosition, type.id);
+		LogWarning("Scenery at {0} type {1} now falling", currentPosition, type.id);
 		falling = true;
 		// state.current_battle->queueVisionRefresh(position);
 		// state.current_battle->queuePathfindingRefresh(position);

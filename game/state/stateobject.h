@@ -4,7 +4,6 @@
 #include "library/sp.h"
 #include "library/strings.h"
 #include "library/strings_format.h"
-#include <exception>
 #include <map>
 
 namespace OpenApoc
@@ -41,7 +40,7 @@ template <typename T> class StateObject
 		return getPrefix() + Strings::fromU64(id);
 	}
 
-	virtual void destroy(){};
+	virtual void destroy() {};
 	// StateObjects are not copy-able
 	StateObject(const StateObject &) = delete;
 	// Move is fine
@@ -67,13 +66,13 @@ template <typename T> class StateRef
 		auto idPrefix = id.substr(0, prefix.length());
 		if (prefix != idPrefix)
 		{
-			LogWarning("%s object has invalid prefix - expected \"%s\" ID \"%s\"", T::getTypeName(),
-			           T::getPrefix(), id);
+			LogWarning("{0} object has invalid prefix - expected \"{1}\" ID \"{2}\"",
+			           T::getTypeName(), T::getPrefix(), id);
 		}
 		obj = T::get(*state, id);
 		if (!obj)
 		{
-			LogError("No %s object matching ID \"%s\" found", T::getTypeName(), id);
+			LogError("No {0} object matching ID \"{1}\" found", T::getTypeName(), id);
 		}
 	}
 

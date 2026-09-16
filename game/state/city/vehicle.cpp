@@ -1,6 +1,7 @@
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
 #endif
+
 #include "game/state/city/vehicle.h"
 #include "framework/configfile.h"
 #include "framework/framework.h"
@@ -15,6 +16,7 @@
 #include "game/state/city/vequipment.h"
 #include "game/state/gameevent.h"
 #include "game/state/gamestate.h"
+#include "game/state/gametime.h"
 #include "game/state/rules/aequipmenttype.h"
 #include "game/state/rules/city/citycommonsamplelist.h"
 #include "game/state/rules/city/scenerytiletype.h"
@@ -30,10 +32,12 @@
 #include "game/state/tilemap/tileobject_shadow.h"
 #include "game/state/tilemap/tileobject_vehicle.h"
 #include "library/sp.h"
+#include <cstdlib>
+#include <fstream>
 #include <glm/glm.hpp>
 #include <glm/gtx/vector_angle.hpp>
+#include <iostream>
 #include <limits>
-#include <queue>
 #include <random>
 
 namespace OpenApoc
@@ -87,7 +91,7 @@ const UString &StateObject<Vehicle>::getId(const GameState &state, const sp<Vehi
 		if (v.second == ptr)
 			return v.first;
 	}
-	LogError("No vehicle matching pointer %p", static_cast<void *>(ptr.get()));
+	LogError("No vehicle matching pointer {0:p}", static_cast<void *>(ptr.get()));
 	return emptyString;
 }
 
@@ -284,6 +288,9 @@ class FlyingVehicleMover : public VehicleMover
 				//   Otherwise we think we'll be moving too slow to dodge (basically moving
 				//   backwards into projectile or forwards alongside it and still getting hit)
 				auto point2d = glm::normalize(Vec2<float>{point.x, point.y});
+				// Use the vehicle's owning tile (integer) as the base so offsets don't get
+				// truncated toward zero and collapse onto the vehicle's own tile near 0
+				auto ownTile = vehicle.tileObject->getOwningTile()->position;
 				// Gather all allowed dodge locations according to the rules above
 				std::list<Vec3<int>> possibleDodgeLocations;
 				for (int x = -1; x <= 1; x++)
@@ -310,21 +317,19 @@ class FlyingVehicleMover : public VehicleMover
 								continue;
 							}
 							// Dodging horizontally
-							possibleDodgeLocations.emplace_back(
-							    vehicle.position.x + x, vehicle.position.y + y, vehicle.position.z);
+							possibleDodgeLocations.emplace_back(ownTile.x + x, ownTile.y + y,
+							                                    ownTile.z);
 						}
 						// Dodging vertically
 						if (dodgeUp)
 						{
-							possibleDodgeLocations.emplace_back(vehicle.position.x + x,
-							                                    vehicle.position.y + y,
-							                                    vehicle.position.z + 1.0f);
+							possibleDodgeLocations.emplace_back(ownTile.x + x, ownTile.y + y,
+							                                    ownTile.z + 1);
 						}
 						if (dodgeDown)
 						{
-							possibleDodgeLocations.emplace_back(vehicle.position.x + x,
-							                                    vehicle.position.y + y,
-							                                    vehicle.position.z + -1.0f);
+							possibleDodgeLocations.emplace_back(ownTile.x + x, ownTile.y + y,
+							                                    ownTile.z - 1);
 						}
 					}
 				}
@@ -380,11 +385,14 @@ class FlyingVehicleMover : public VehicleMover
 		}
 		if (vehicle.carriedByVehicle)
 		{
-			auto newPos = vehicle.carriedByVehicle->position;
-			newPos.z = std::max(0.0f, newPos.z - 0.5f);
-			vehicle.setPosition(newPos);
-			vehicle.facing = vehicle.carriedByVehicle->facing;
-			vehicle.updateSprite(state);
+			if (vehicle.tileObject)
+			{
+				auto newPos = vehicle.carriedByVehicle->position;
+				newPos.z = std::max(0.0f, newPos.z - 0.5f);
+				vehicle.setPosition(newPos);
+				vehicle.facing = vehicle.carriedByVehicle->facing;
+				vehicle.updateSprite(state);
+			}
 			return;
 		}
 		if (vehicle.crashed)
@@ -557,7 +565,6 @@ class FlyingVehicleMover : public VehicleMover
 					// d += 0.12f * (float)M_PI;
 					vehicle.ticksToTurn = floorf(d / vehicle.angularVelocity);
 
-					// FIXME: Introduce proper turning speed
 					// Here we just slow down velocity if we're moving too quickly
 					if (vehicle.position != vehicle.goalPosition)
 					{
@@ -567,10 +574,11 @@ class FlyingVehicleMover : public VehicleMover
 						    std::max(floorf(glm::length(vectorToGoal) /
 						                    glm::length(vehicle.velocity) * (float)TICK_SCALE) -
 						                 5.0f,
-						             1.0f);
+						             2.0f);
 						if (ticksToMove < vehicle.ticksToTurn)
 						{
-							vehicle.velocity *= (float)ticksToMove / (float)vehicle.ticksToTurn;
+							vehicle.velocity *=
+							    std::abs(vehicle.angularVelocity) * TURNING_SLOW_DOWN_CORRECTION;
 						}
 					}
 				}
@@ -1127,12 +1135,8 @@ void VehicleMover::updateCrashed(GameState &state, unsigned int ticks [[maybe_un
 	if (vehicle.tileObject && vehicle.tileObject->getOwningTile() &&
 	    vehicle.tileObject->getOwningTile()->presentScenery)
 	{
-		auto presentScenery = vehicle.tileObject->getOwningTile()->presentScenery;
-		if (!presentScenery)
-		{
-			vehicle.setCrashed(state, false);
-			vehicle.startFalling(state);
-		}
+		vehicle.setCrashed(state, false);
+		vehicle.startFalling(state);
 	}
 }
 
@@ -1279,7 +1283,7 @@ void Vehicle::leaveDimensionGate(GameState &state)
 	auto initialPosition = (*portal)->getPosition();
 	auto initialFacing = 0.0f;
 
-	LogInfo("Leaving dimension gate %s", this->name);
+	LogInfo("Leaving dimension gate {0}", this->name);
 	LogAssert(this->betweenDimensions == true);
 	if (this->tileObject)
 	{
@@ -1340,7 +1344,7 @@ void Vehicle::enterDimensionGate(GameState &state)
 
 void Vehicle::leaveBuilding(GameState &state, Vec3<float> initialPosition, float initialFacing)
 {
-	LogInfo("Launching %s", this->name);
+	LogInfo("Launching {0}", this->name);
 	if (this->tileObject)
 	{
 		LogError("Trying to launch already-launched vehicle");
@@ -1366,13 +1370,14 @@ void Vehicle::enterBuilding(GameState &state, StateRef<Building> b)
 {
 	carriedByVehicle.clear();
 	crashed = false;
-	if (this->currentBuilding)
+	if (b->currentVehicles.find(&state) != b->currentVehicles.end())
 	{
 		LogError("Vehicle already in a building?");
 		return;
 	}
 	this->currentBuilding = b;
 	b->currentVehicles.insert({&state, shared_from_this()});
+
 	if (carriedVehicle)
 	{
 		carriedVehicle->enterBuilding(state, b);
@@ -1490,7 +1495,7 @@ void Vehicle::processRecoveredVehicle(GameState &state)
 		{
 			fw().pushEvent(new GameSomethingDiedEvent(
 			    GameEventType::VehicleModuleScrapped,
-			    format("%s - %s", getFormattedVehicleNameForEventMessage(state), e->type->name),
+			    format("{0} - {1}", getFormattedVehicleNameForEventMessage(state), e->type->name),
 			    position));
 		}
 	}
@@ -1734,8 +1739,32 @@ StateRef<Building> Vehicle::getServiceDestination(GameState &state)
 	// Step 01: Find first cargo destination and remove arrived cargo
 	for (auto it = cargo.begin(); it != cargo.end();)
 	{
-		if (it->destination == currentBuilding)
+		if (cargoDeliverableAtCurrentBuilding(*it))
 		{
+			it->destination = currentBuilding;
+			// Only add aliens if alien containment is available at base
+			const auto vehicleContainsAlienLoot = cargoContainsAlienLoot();
+			const auto alienContainmentExists =
+			    currentBuilding->base ? currentBuilding->base->alienContainmentExists() : false;
+
+			// Vehicle must be stopped from unloading alien cargo when vehicle has alien loot but
+			// base has no alien containment
+			const auto isVehicleAllowedToUnloadAlienCargo =
+			    !(vehicleContainsAlienLoot && !alienContainmentExists);
+
+			if (!isVehicleAllowedToUnloadAlienCargo)
+			{
+				fw().pushEvent(
+				    new GameVehicleEvent(GameEventType::VehicleWithAlienLootInBaseWithNoContainment,
+				                         {&state, shared_from_this()}));
+			}
+			// Only unload alien cargo when base has alien containment
+			if (it->type == Cargo::Type::Bio && !isVehicleAllowedToUnloadAlienCargo)
+			{
+				it++;
+				continue;
+			}
+
 			it->arrive(state, cargoArrived, bioArrived, recoveryArrived, transferArrived,
 			           suppliers);
 			it = cargo.erase(it);
@@ -1876,8 +1905,9 @@ void Vehicle::die(GameState &state, bool silent, StateRef<Vehicle> attacker)
 		currentBuilding->currentVehicles.erase(StateRef<Vehicle>(&state, shared_from_this()));
 	}
 
-	// Dying will remove agent from current agents list
-	for (auto agent : currentAgents)
+	// Copy the list before iterating since die() modifies currentAgents
+	auto agentsCopy = currentAgents;
+	for (auto agent : agentsCopy)
 	{
 		agent->die(state, true);
 	}
@@ -1991,48 +2021,12 @@ void Vehicle::adjustRelationshipOnDowned(GameState &state, StateRef<Vehicle> att
 	// If we're hostile to attacker - lose 5 points
 	if (owner->isRelatedTo(attacker->owner) == Organisation::Relation::Hostile)
 	{
-		owner->adjustRelationTo(state, attacker->owner, -5.0f);
+		owner->adjustRelationTo(state, attacker->owner, -5.0f, true);
 	}
 	// If we're not hostile to attacker - lose 30 points
 	else
 	{
-		owner->adjustRelationTo(state, attacker->owner, -30.0f);
-	}
-	// Our allies lose 15 points, enemies gain 5 points
-	// Otherwise 20+ relationship is +-3 points, 10+ is +-1 points
-	for (auto &org : state.organisations)
-	{
-		if (org.first != attacker->owner.id && org.first != state.getCivilian().id)
-		{
-			if (org.second->isRelatedTo(owner) == Organisation::Relation::Hostile)
-			{
-				org.second->adjustRelationTo(state, attacker->owner, 5.0f);
-			}
-			else if (org.second->isRelatedTo(owner) == Organisation::Relation::Allied)
-			{
-				org.second->adjustRelationTo(state, attacker->owner, -15.0f);
-			}
-			else
-			{
-				auto rel = org.second->getRelationTo(owner);
-				if (rel > 20.0f)
-				{
-					org.second->adjustRelationTo(state, attacker->owner, -3.0f);
-				}
-				else if (rel > 10.0f)
-				{
-					org.second->adjustRelationTo(state, attacker->owner, -1.0f);
-				}
-				else if (rel < -10.0f)
-				{
-					org.second->adjustRelationTo(state, attacker->owner, 1.0f);
-				}
-				else if (rel < -20.0f)
-				{
-					org.second->adjustRelationTo(state, attacker->owner, 3.0f);
-				}
-			}
-		}
+		owner->adjustRelationTo(state, attacker->owner, -30.0f, true);
 	}
 }
 
@@ -2378,7 +2372,7 @@ void Vehicle::updateCargo(GameState &state)
 		// Either this is non-combat loot, or this loot belongs to this building
 		// Don't keep trying to ferry combat loot to other building as we're NOT going to move
 		// when we check it in getServiceDestination method!
-		if (c.originalOwner || c.destination == currentBuilding)
+		if (c.originalOwner || cargoDeliverableAtCurrentBuilding(c))
 		{
 			needFerry = true;
 			break;
@@ -3143,11 +3137,15 @@ Vehicle::addMission(GameState &state, VehicleMission mission, bool toBack)
 		// - Can place on carrying vehicles
 		case VehicleMission::MissionType::GotoLocation:
 		case VehicleMission::MissionType::Land:
-			if (crashed || sliding || falling)
+		{
+			bool executingCrashMission =
+			    !missions.empty() && missions.front().type == VehicleMission::MissionType::Crash;
+			if ((crashed && !executingCrashMission) || sliding || falling)
 			{
 				return missions.end();
 			}
 			break;
+		}
 		// - Cannot place in front
 		// - Cannot place on crashed vehicles
 		// - Cannot place on carrying vehicles
@@ -3281,12 +3279,12 @@ bool Vehicle::popFinishedMissions(GameState &state)
 		{
 			return false;
 		}
-		LogInfo("Vehicle %s mission \"%s\" finished", name, missions.front().getName());
+		LogInfo("Vehicle {0} mission \"{1}\" finished", name, missions.front().getName());
 		missions.pop_front();
 		popped = true;
 		if (!missions.empty())
 		{
-			LogInfo("Vehicle %s mission \"%s\" starting", name, missions.front().getName());
+			LogInfo("Vehicle {0} mission \"{1}\" starting", name, missions.front().getName());
 			missions.front().start(state, *this);
 			continue;
 		}
@@ -3320,14 +3318,15 @@ bool Vehicle::getNewGoal(GameState &state, int &turboTiles)
 	} while (popped && !acquired && debug_deadlock_preventor > 0);
 	if (debug_deadlock_preventor <= 0)
 	{
-		LogWarning("Vehicle %s at %s", name, position);
+		LogWarning("Vehicle {0} at {1}", name, position);
 		for (auto &m : missions)
 		{
-			LogWarning("Mission %s", m.getName());
+			LogWarning("Mission {0}", m.getName());
 		}
-		LogError("Vehicle %s deadlocked, please send log to developers. Vehicle will self-destruct "
-		         "now...",
-		         name);
+		LogError(
+		    "Vehicle {0} deadlocked, please send log to developers. Vehicle will self-destruct "
+		    "now...",
+		    name);
 		die(state);
 		return false;
 	}
@@ -3644,7 +3643,7 @@ sp<VEquipment> Vehicle::addEquipment(GameState &state, Vec2<int> pos,
 	// layouts
 	// if (!this->canAddEquipment(pos, type))
 	//{
-	//	LogError("Trying to add \"%s\" at {%d,%d} on vehicle \"%s\" failed", type.id, pos.x,
+	//	LogError("Trying to add \"{0}\" at {{{1},{2}}} on vehicle \"{3}\" failed", type.id, pos.x,
 	//	         pos.y, this->name);
 	//}
 	Vec2<int> slotOrigin;
@@ -3662,7 +3661,7 @@ sp<VEquipment> Vehicle::addEquipment(GameState &state, Vec2<int> pos,
 	// If this was not within a slow fail
 	if (!slotFound)
 	{
-		LogError("Equipping \"%s\" on \"%s\" at %s failed: No valid slot", equipmentType->name,
+		LogError("Equipping \"{0}\" on \"{1}\" at {2} failed: No valid slot", equipmentType->name,
 		         this->name, pos);
 		return nullptr;
 	}
@@ -3677,7 +3676,7 @@ sp<VEquipment> Vehicle::addEquipment(GameState &state, Vec2<int> pos,
 			this->equipment.emplace_back(engine);
 			engine->owner = thisRef;
 			engine->equippedPosition = slotOrigin;
-			LogInfo("Equipped \"%s\" with engine \"%s\"", this->name, equipmentType->name);
+			LogInfo("Equipped \"{0}\" with engine \"{1}\"", this->name, equipmentType->name);
 			return engine;
 		}
 		case EquipmentSlotType::VehicleWeapon:
@@ -3688,21 +3687,21 @@ sp<VEquipment> Vehicle::addEquipment(GameState &state, Vec2<int> pos,
 			weapon->owner = thisRef;
 			this->equipment.emplace_back(weapon);
 			weapon->equippedPosition = slotOrigin;
-			LogInfo("Equipped \"%s\" with weapon \"%s\"", this->name, equipmentType->name);
+			LogInfo("Equipped \"{0}\" with weapon \"{1}\"", this->name, equipmentType->name);
 			return weapon;
 		}
 		case EquipmentSlotType::VehicleGeneral:
 		{
 			auto equipment = mksp<VEquipment>();
 			equipment->type = equipmentType;
-			LogInfo("Equipped \"%s\" with general equipment \"%s\"", this->name,
+			LogInfo("Equipped \"{0}\" with general equipment \"{1}\"", this->name,
 			        equipmentType->name);
 			equipment->equippedPosition = slotOrigin;
 			this->equipment.emplace_back(equipment);
 			return equipment;
 		}
 		default:
-			LogError("Equipment \"%s\" for \"%s\" at pos (%d,%d} has invalid type",
+			LogError("Equipment \"{0}\" for \"{1}\" at pos ({2},{3}} has invalid type",
 			         equipmentType->name, this->name, pos.x, pos.y);
 			return nullptr;
 	}
@@ -3758,7 +3757,7 @@ void Vehicle::equipDefaultEquipment(GameState &state)
 {
 	equipment.clear();
 	loot.clear();
-	LogInfo("Equipping \"%s\" with default equipment", this->type->name);
+	LogInfo("Equipping \"{0}\" with default equipment", this->type->name);
 	auto alien = owner == state.getAliens();
 	for (auto &pair : this->type->initial_equipment_list)
 	{
@@ -3811,7 +3810,7 @@ template <> sp<Vehicle> StateObject<Vehicle>::get(const GameState &state, const 
 	auto it = state.vehicles.find(id);
 	if (it == state.vehicles.end())
 	{
-		LogError("No vehicle matching ID \"%s\"", id);
+		LogError("No vehicle matching ID \"{0}\"", id);
 		return nullptr;
 	}
 	return it->second;
@@ -3860,9 +3859,29 @@ const UString Vehicle::getFormattedVehicleNameForEventMessage(GameState &state) 
 {
 	if (config().getBool("OpenApoc.NewFeature.ShowNonXCOMVehiclesPrefix") &&
 	    owner != state.getPlayer())
-		return format("%s %s", tr("*"), name);
+		return format("* {0}", name);
 
 	return name;
+}
+
+const bool Vehicle::cargoContainsAlienLoot() const
+{
+	for (const auto &cargoItem : cargo)
+	{
+		if (cargoItem.type == Cargo::Type::Bio)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool Vehicle::cargoDeliverableAtCurrentBuilding(const Cargo &c) const
+{
+	return currentBuilding &&
+	       (c.destination == currentBuilding ||
+	        (!c.originalOwner && currentBuilding->base && currentBuilding->owner == owner));
 }
 
 Cargo::Cargo(GameState &state, StateRef<AEquipmentType> equipment, int count, int price,
@@ -3940,7 +3959,7 @@ void Cargo::refund(GameState &state, StateRef<Building> currentBuilding)
 			case Type::Bio:
 				if (state.economy.find(id) != state.economy.end())
 				{
-					LogError("Economy found for bio item!?", id);
+					LogError("Economy found for bio item!? {0}", id);
 				}
 				break;
 			case Type::Agent:
@@ -4040,7 +4059,7 @@ void Cargo::seize(GameState &state, StateRef<Organisation> org [[maybe_unused]])
 		case Type::Bio:
 			if (state.economy.find(id) != state.economy.end())
 			{
-				LogError("Economy found for bio item!?", id);
+				LogError("Economy found for bio item!? {0}", id);
 			}
 			break;
 		case Type::Agent:
@@ -4059,7 +4078,7 @@ void Cargo::seize(GameState &state, StateRef<Organisation> org [[maybe_unused]])
 	}
 	int worth = cost * count / divisor;
 	// FIXME: Adjust relationship accordingly to seized cargo's worth
-	LogWarning("Adjust relationship accordingly to worth: %d", worth);
+	LogWarning("Adjust relationship accordingly to worth: {0}", worth);
 	if (destination->owner == state.getPlayer())
 	{
 		fw().pushEvent(

@@ -2,7 +2,6 @@
 #include "game/state/gamestate.h"
 #include "game/state/shared/aequipment.h"
 #include "game/state/tilemap/tilemap.h"
-#include <climits>
 
 namespace OpenApoc
 {
@@ -25,7 +24,7 @@ sp<AEquipmentType> StateObject<AEquipmentType>::get(const GameState &state, cons
 	auto it = state.agent_equipment.find(id);
 	if (it == state.agent_equipment.end())
 	{
-		LogError("No aequipement type matching ID \"%s\"", id);
+		LogError("No aequipement type matching ID \"{0}\"", id);
 		return nullptr;
 	}
 	return it->second;
@@ -46,15 +45,11 @@ template <> const UString &StateObject<EquipmentSet>::getTypeName()
 template <>
 sp<EquipmentSet> StateObject<EquipmentSet>::get(const GameState &state, const UString &id)
 {
-	auto it = state.equipment_sets_by_score.find(id);
-	if (it == state.equipment_sets_by_score.end())
+	auto it = state.equipment_sets.find(id);
+	if (it == state.equipment_sets.end())
 	{
-		it = state.equipment_sets_by_level.find(id);
-		if (it == state.equipment_sets_by_level.end())
-		{
-			LogError("No equipment set (score) matching ID \"%s\"", id);
-			return nullptr;
-		}
+		LogError("No equipment set matching ID \"{0}\"", id);
+		return nullptr;
 	}
 	return it->second;
 }
@@ -95,25 +90,16 @@ std::list<const AEquipmentType *> EquipmentSet::generateEquipmentList(GameState 
 	return output;
 }
 
-sp<EquipmentSet> EquipmentSet::getByScore(const GameState &state, const int score)
+sp<EquipmentSet> EquipmentSet::getForType(const GameState &state, Type type, int score)
 {
-	for (auto &es : state.equipment_sets_by_score)
+	for (auto &es : state.equipment_sets)
 	{
+		if (es.second->type != type)
+			continue;
 		if (es.second->isAppropriate(score))
 			return es.second;
 	}
-	LogError("No equipment set matching score %d", score);
-	return nullptr;
-}
-
-sp<EquipmentSet> EquipmentSet::getByLevel(const GameState &state, const int level)
-{
-	for (auto &es : state.equipment_sets_by_level)
-	{
-		if (es.second->isAppropriate(level))
-			return es.second;
-	}
-	LogError("No equipment set matching level %d", level);
+	LogError("No equipment set of type {0} matching score {1}", static_cast<int>(type), score);
 	return nullptr;
 }
 
@@ -125,6 +111,26 @@ bool AEquipmentType::canBeUsed(GameState &state, StateRef<Organisation> owner) c
 		return false;
 	}
 	return true;
+}
+
+bool AEquipmentType::isResearched() const
+{
+	StateRef<ResearchTopic> equipmentTopic;
+
+	for (auto &dependencyTopic : research_dependency.topics)
+	{
+		if (dependencyTopic->name == name)
+		{
+			equipmentTopic = dependencyTopic;
+			break;
+		}
+	}
+
+	// If no research topic is found with same name as type, then we use "satisfied()" instead
+	// This is not the prefered method since it will consider not only specific topic but all
+	// children topics as well
+
+	return equipmentTopic ? equipmentTopic->isComplete() : research_dependency.satisfied();
 }
 
 float AEquipmentType::getRoundsPerSecond() const

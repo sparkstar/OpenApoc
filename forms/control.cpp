@@ -10,7 +10,6 @@
 #include "framework/image.h"
 #include "framework/options.h"
 #include "framework/renderer.h"
-#include "framework/sound.h"
 #include "library/sp.h"
 #include <iterator>
 
@@ -23,8 +22,8 @@ Control::Control(bool takesFocus)
       Size(0, 0), SelectionSize(0, 0), BackgroundColour(0, 0, 0, 0), takesFocus(takesFocus),
       showBounds(false), Enabled(true), canCopy(true),
       // Tooltip defaults
-      ToolTipBackground{128, 128, 128}, ToolTipBorders{
-                                            {1, {0, 0, 0}}, {1, {255, 255, 255}}, {1, {0, 0, 0, 0}}}
+      ToolTipBackground{128, 128, 128},
+      ToolTipBorders{{1, {0, 0, 0}}, {1, {255, 255, 255}}, {1, {0, 0, 0, 0}}}
 {
 	this->ToolTipFont = ui().getFont(Options::defaultTooltipFont.get());
 }
@@ -560,7 +559,7 @@ void Control::configureChildrenFromXml(pugi::xml_node *parent)
 			}
 			else
 			{
-				LogError("Radiobutton \"%s\" has no group", node.attribute("id").as_string());
+				LogError("Radiobutton \"{0}\" has no group", node.attribute("id").as_string());
 			}
 			auto rb = this->createChild<RadioButton>(group);
 			rb->configureFromXml(&node);
@@ -652,7 +651,7 @@ void Control::configureSelfFromXml(pugi::xml_node *node)
 			auto pal = fw().data->loadPalette(child.text().get());
 			if (!pal)
 			{
-				LogError("Control referenced palette \"%s\" that cannot be loaded",
+				LogError("Control referenced palette \"{0}\" that cannot be loaded",
 				         child.text().get());
 			}
 			this->palette = pal;
@@ -723,7 +722,7 @@ void Control::configureSelfFromXml(pugi::xml_node *node)
 				}
 				else
 				{
-					LogWarning("Control \"%s\" has not supported size x value \"%s\"", this->Name,
+					LogWarning("Control \"{0}\" has not supported size x value \"{1}\"", this->Name,
 					           specialsizex);
 				}
 			}
@@ -752,13 +751,13 @@ void Control::configureSelfFromXml(pugi::xml_node *node)
 					else
 					{
 						LogWarning(
-						    "Control \"%s\" with \"item\" size.y does not have ListBox parent ",
+						    "Control \"{0}\" with \"item\" size.y does not have ListBox parent ",
 						    this->Name);
 					}
 				}
 				else
 				{
-					LogWarning("Control \"%s\" has not supported size y value \"%s\"", this->Name,
+					LogWarning("Control \"{0}\" has not supported size y value \"{1}\"", this->Name,
 					           specialsizey);
 				}
 			}
@@ -769,12 +768,10 @@ void Control::configureSelfFromXml(pugi::xml_node *node)
 			if (tooltipFont)
 			{
 				ToolTipText = child.attribute("text").as_string();
-				if (!ToolTipText.empty())
-					ToolTipText = tr(ToolTipText);
 			}
 			else
 			{
-				LogWarning("Could not find font for tooltip of control \"%s\"", Name);
+				LogWarning("Could not find font for tooltip of control \"{0}\"", Name);
 			}
 			UString backgroundString = child.attribute("background").as_string();
 			if (!backgroundString.empty())
@@ -842,7 +839,7 @@ void Control::configureSelfFromXml(pugi::xml_node *node)
 		}
 	}
 
-	LogInfo("Control \"%s\" has %zu subcontrols (%d, %d, %d, %d)", this->Name, Controls.size(),
+	LogInfo("Control \"{0}\" has {1} subcontrols ({2}, {3}, {4}, {5})", this->Name, Controls.size(),
 	        Location.x, Location.y, Size.x, Size.y);
 }
 
@@ -1191,7 +1188,7 @@ void Control::pushFormEvent(FormEventType type, Event *parentEvent)
 			break;
 		}
 		default:
-			LogError("Unexpected event type %d", (int)type);
+			LogError("Unexpected event type {0}", (int)type);
 	}
 	this->triggerEventCallbacks(event);
 }

@@ -49,18 +49,18 @@ void Organisation::takeOver(GameState &state, bool forced)
 	militarized = true;
 	infiltrationValue = 200;
 	StateRef<Organisation> org = {&state, id};
-	current_relations[state.getPlayer()] = -100.0f;
-	state.getPlayer()->current_relations[org] = -100.0f;
-	current_relations[state.getAliens()] = 100.0f;
-	state.getAliens()->current_relations[org] = 100.0f;
+	establishRelation(state.getPlayer(), -100.0f);
+	state.getPlayer()->establishRelation(org, -100.0f);
+	establishRelation(state.getAliens(), 100.0f);
+	state.getAliens()->establishRelation(org, 100.0f);
 	for (auto &pair : state.organisations)
 	{
 		if (pair.second->id == id || !pair.second->takenOver)
 		{
 			continue;
 		}
-		current_relations[{&state, pair.first}] = 90.0f;
-		pair.second->current_relations[org] = 90.0f;
+		establishRelation({&state, pair.first}, 90.0f);
+		pair.second->establishRelation(org, 90.0f);
 	}
 	auto event = new GameOrganisationEvent(GameEventType::AlienTakeover, {&state, id});
 	fw().pushEvent(event);
@@ -176,7 +176,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 	int price = 0;
 	if (state.economy.find(vehicleEquipment.id) == state.economy.end())
 	{
-		LogError("Economy not found for %s: How are we buying it then!?", vehicleEquipment.id);
+		LogError("Economy not found for {0}: How are we buying it then!?", vehicleEquipment.id);
 	}
 	else
 	{
@@ -187,7 +187,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 			economy.currentStock -= count;
 			if (economy.currentStock < 0)
 			{
-				LogInfo("Economy went into negative stock for %s: Was it because we used economy "
+				LogInfo("Economy went into negative stock for {0}: Was it because we used economy "
 				        "to transfer?",
 				        vehicleEquipment.id);
 			}
@@ -198,7 +198,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 	auto building = buyer->owner->id == id ? buyer : getPurchaseBuilding(state, buyer);
 	building->cargo.emplace_back(state, vehicleEquipment, count, price,
 	                             StateRef<Organisation>{&state, id}, buyer);
-	LogWarning("PURCHASE: %s bought %dx%s at %s to %s ", buyer->owner.id, count,
+	LogWarning("PURCHASE: {0} bought {1}x{2} at {3} to {4} ", buyer->owner.id, count,
 	           vehicleEquipment.id, building.id, buyer.id);
 	auto owner = buyer->owner;
 	owner->balance -= count * price;
@@ -210,7 +210,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 	int price = 0;
 	if (state.economy.find(vehicleAmmo.id) == state.economy.end())
 	{
-		LogError("Economy not found for %s: How are we buying it then!?", vehicleAmmo.id);
+		LogError("Economy not found for {0}: How are we buying it then!?", vehicleAmmo.id);
 	}
 	else
 	{
@@ -221,7 +221,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 			economy.currentStock -= count;
 			if (economy.currentStock < 0)
 			{
-				LogInfo("Economy went into negative stock for %s: Was it because we used economy "
+				LogInfo("Economy went into negative stock for {0}: Was it because we used economy "
 				        "to transfer?",
 				        vehicleAmmo.id);
 			}
@@ -232,8 +232,8 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 	auto building = buyer->owner->id == id ? buyer : getPurchaseBuilding(state, buyer);
 	building->cargo.emplace_back(state, vehicleAmmo, count, price,
 	                             StateRef<Organisation>{&state, id}, buyer);
-	LogWarning("PURCHASE: %s bought %dx%s at %s to %s ", buyer->owner.id, count, vehicleAmmo.id,
-	           building.id, buyer.id);
+	LogWarning("PURCHASE: {0} bought {1}x{2} at {3} to {4} ", buyer->owner.id, count,
+	           vehicleAmmo.id, building.id, buyer.id);
 	auto owner = buyer->owner;
 	owner->balance -= count * price;
 }
@@ -244,7 +244,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 	int price = 0;
 	if (state.economy.find(agentEquipment.id) == state.economy.end())
 	{
-		LogError("Economy not found for %s: How are we buying it then!?", agentEquipment.id);
+		LogError("Economy not found for {0}: How are we buying it then!?", agentEquipment.id);
 	}
 	else
 	{
@@ -255,7 +255,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 			economy.currentStock -= count;
 			if (economy.currentStock < 0)
 			{
-				LogInfo("Economy went into negative stock for %s: Was it because we used economy "
+				LogInfo("Economy went into negative stock for {0}: Was it because we used economy "
 				        "to transfer?",
 				        agentEquipment.id);
 			}
@@ -268,8 +268,8 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 	    state, agentEquipment,
 	    count * (agentEquipment->type == AEquipmentType::Type::Ammo ? agentEquipment->max_ammo : 1),
 	    price, StateRef<Organisation>{&state, id}, buyer);
-	LogWarning("PURCHASE: %s bought %dx%s at %s to %s ", buyer->owner.id, count, agentEquipment.id,
-	           building.id, buyer.id);
+	LogWarning("PURCHASE: {0} bought {1}x{2} at {3} to {4} ", buyer->owner.id, count,
+	           agentEquipment.id, building.id, buyer.id);
 	auto owner = buyer->owner;
 	owner->balance -= count * price;
 }
@@ -280,7 +280,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 	int price = 0;
 	if (state.economy.find(vehicleType.id) == state.economy.end())
 	{
-		LogError("Economy not found for %s: How are we buying it then!?", vehicleType.id);
+		LogError("Economy not found for {0}: How are we buying it then!?", vehicleType.id);
 	}
 	else
 	{
@@ -291,7 +291,7 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 			economy.currentStock -= count;
 			if (economy.currentStock < 0)
 			{
-				LogError("Economy went into negative stock for %s: How the hell?", vehicleType.id);
+				LogError("Economy went into negative stock for {0}: How the hell?", vehicleType.id);
 			}
 		}
 	}
@@ -303,8 +303,8 @@ void Organisation::purchase(GameState &state, const StateRef<Building> &buyer,
 		v->homeBuilding = buyer;
 		v->setMission(state, VehicleMission::gotoBuilding(state, *v));
 	}
-	LogWarning("PURCHASE: %s bought %dx%s at %s to %s ", buyer->owner.id, count, vehicleType.id,
-	           building.id, buyer.id);
+	LogWarning("PURCHASE: {0} bought {1}x{2} at {3} to {4} ", buyer->owner.id, count,
+	           vehicleType.id, building.id, buyer.id);
 	auto owner = buyer->owner;
 	owner->balance -= count * price;
 }
@@ -428,86 +428,71 @@ void Organisation::updateMissions(GameState &state)
 			m.execute(state, state.current_city, currentOrg);
 		}
 	}
-	// Find rescue-capable craft
-	StateRef<Vehicle> rescueTransport;
+	// Find all idle rescue-capable craft
+	std::vector<StateRef<Vehicle>> rescueTransports;
 	for (auto &v : state.vehicles)
 	{
 		if (v.second->owner.id == id && v.second->missions.empty() &&
 		    v.second->type->canRescueCrashed)
 		{
-			rescueTransport = {&state, v.first};
-			break;
+			rescueTransports.emplace_back(&state, v.first);
 		}
 	}
-	// Attempt rescue someone
-	if (rescueTransport)
+	if (rescueTransports.empty())
 	{
+		return;
+	}
+	// Victims already claimed by a RecoverVehicle mission, so two rescuers already dispatched
+	// (or dispatched earlier in this loop) never chase the same target
+	std::set<UString> claimedVictims;
+	for (auto &r : state.vehicles)
+	{
+		for (auto &m : r.second->missions)
+		{
+			if (m.type == VehicleMission::MissionType::RecoverVehicle)
+			{
+				claimedVictims.insert(m.targetVehicle.id);
+			}
+		}
+	}
+	// Dispatch every idle rescue craft this call, instead of just the first one
+	for (auto &rescueTransport : rescueTransports)
+	{
+		StateRef<Vehicle> target;
 		// Rescue owned
 		for (auto &v : state.vehicles)
 		{
 			if (v.second->city == rescueTransport->city && v.second->owner.id == id &&
+			    claimedVictims.find(v.first) == claimedVictims.end() &&
 			    VehicleMission::canRecoverVehicle(state, *rescueTransport, *v.second))
 			{
-				bool foundRescuer = false;
-				for (auto &r : state.vehicles)
+				target = {&state, v.first};
+				break;
+			}
+		}
+		// Rescue allies but not aliens
+		if (!target)
+		{
+			for (auto &v : state.vehicles)
+			{
+				if (v.second->city == rescueTransport->city &&
+				    v.second->owner != state.getAliens() && v.second->owner.id != id &&
+				    isRelatedTo(v.second->owner) == Relation::Allied &&
+				    claimedVictims.find(v.first) == claimedVictims.end() &&
+				    VehicleMission::canRecoverVehicle(state, *rescueTransport, *v.second))
 				{
-					if (r.second->city == rescueTransport->city && r.second->type->canRescueCrashed)
-					{
-						for (auto &m : r.second->missions)
-						{
-							if (m.type == VehicleMission::MissionType::RecoverVehicle &&
-							    m.targetVehicle.id == v.first)
-							{
-								foundRescuer = true;
-								break;
-							}
-						}
-					}
-				}
-				if (!foundRescuer)
-				{
-					rescueTransport->setMission(
-					    state,
-					    VehicleMission::recoverVehicle(state, *rescueTransport, {&state, v.first}));
-					rescueTransport->addMission(
-					    state, VehicleMission::gotoBuilding(state, *rescueTransport), true);
+					target = {&state, v.first};
 					break;
 				}
 			}
 		}
-		// Rescue allies but not aliens
-		for (auto &v : state.vehicles)
+		if (target)
 		{
-			if (v.second->city == rescueTransport->city && v.second->owner != state.getAliens() &&
-			    v.second->owner.id != id && isRelatedTo(v.second->owner) == Relation::Allied &&
-			    VehicleMission::canRecoverVehicle(state, *rescueTransport, *v.second))
-			{
-				bool foundRescuer = false;
-				for (auto &r : state.vehicles)
-				{
-					if (r.second->city == rescueTransport->city && r.second->type->canRescueCrashed)
-					{
-						for (auto &m : r.second->missions)
-						{
-							if (m.type == VehicleMission::MissionType::RecoverVehicle &&
-							    m.targetVehicle.id == v.first)
-							{
-								foundRescuer = true;
-								break;
-							}
-						}
-					}
-				}
-				if (!foundRescuer)
-				{
-					rescueTransport->setMission(
-					    state,
-					    VehicleMission::recoverVehicle(state, *rescueTransport, {&state, v.first}));
-					rescueTransport->addMission(
-					    state, VehicleMission::gotoBuilding(state, *rescueTransport), true);
-					break;
-				}
-			}
+			rescueTransport->setMission(
+			    state, VehicleMission::recoverVehicle(state, *rescueTransport, target));
+			rescueTransport->addMission(
+			    state, VehicleMission::gotoBuilding(state, *rescueTransport), true);
+			claimedVictims.insert(target.id);
 		}
 	}
 }
@@ -524,8 +509,8 @@ void Organisation::updateHirableAgents(GameState &state)
 		std::vector<StateRef<Building>> buildingsWithoutBases;
 		for (auto &b : state.cities["CITYMAP_HUMAN"]->buildings)
 		{
-			if (!b.second->base_layout)
-				buildingsWithoutBases.emplace_back(&state, b.second);
+			if (!b->base_layout)
+				buildingsWithoutBases.emplace_back(b);
 		}
 		if (buildingsWithoutBases.empty())
 		{
@@ -537,7 +522,7 @@ void Organisation::updateHirableAgents(GameState &state)
 	{
 		if (buildings.empty())
 		{
-			LogDebug("Organization %s has no buildings. No agents generated.", this->name);
+			LogDebug("Organization {0} has no buildings. No agents generated.", this->name);
 			return;
 		}
 		hireeLocation = pickRandom(state.rng, buildings);
@@ -643,13 +628,13 @@ float Organisation::updateRelations(StateRef<Organisation> &playerOrg)
 	float playerRelationshipDelta = 0.0;
 	for (auto &pair : current_relations)
 	{
-		float &long_term_value = long_term_relations[pair.first];
+		float &previous_value = previous_relations[pair.first];
 
 		if (pair.first == playerOrg)
 		{
-			playerRelationshipDelta = pair.second - long_term_value;
+			playerRelationshipDelta = pair.second - previous_value;
 		}
-		long_term_value = pair.second;
+		previous_value = pair.second;
 	}
 	return playerRelationshipDelta;
 }
@@ -700,11 +685,11 @@ void Organisation::updateVehicleAgentPark(GameState &state)
 	//	std::list<sp<Building>> buildingsRandomizer;
 	//	for (auto &b : state.cities["CITYMAP_HUMAN"]->buildings)
 	//	{
-	//		if (b.second->owner.id != id)
+	//		if (b->owner.id != id)
 	//		{
 	//			continue;
 	//		}
-	//		buildingsRandomizer.push_back(b.second);
+	//		buildingsRandomizer.push_back(b.getSp());
 	//	}
 	//	sp<Building> building = pickRandom(state.rng, buildingsRandomizer);
 	//	while (countAgents < agentPark)
@@ -799,14 +784,69 @@ float Organisation::getRelationTo(const StateRef<Organisation> &other) const
 	return x;
 }
 
-void Organisation::adjustRelationTo(GameState &state, StateRef<Organisation> other, float value)
+void Organisation::adjustRelationTo(GameState &state, StateRef<Organisation> other, float value,
+                                    bool applyReputationRipple)
 {
+	StateRef<Organisation> thisOrg{&state, id};
 	current_relations[other] = clamp(current_relations[other] + value, -100.0f, 100.0f);
-	// Mirror player relations except in battle
-	if (!state.current_battle && other == state.getPlayer())
+
+	// The ripple never runs mid-battle (relations should not visibly flip while a fight is in
+	// progress), and only when the caller opts in - most adjustRelationTo() calls are narrative
+	// nudges that should not cascade into every other org's standing.
+	if (applyReputationRipple && !state.current_battle)
 	{
-		other->current_relations[{&state, id}] = current_relations[other];
+		// Ally ripple: every other org (bar X-COM, which only ever follows the mirror below)
+		// reacts to this change in proportion to how much it likes us, with extra damping if it
+		// dislikes us. The ripple uses the raw requested delta, not the amount actually applied
+		// after clamping.
+		StateRef<Organisation> playerOrg = state.getPlayer();
+		for (auto &pair : state.organisations)
+		{
+			StateRef<Organisation> k{&state, pair.first};
+			if (k == thisOrg || k == other || k == playerOrg)
+			{
+				continue;
+			}
+			float allyFactor = pair.second->getRelationTo(thisOrg) / 2.0f;
+			if (allyFactor < 0.0f)
+			{
+				allyFactor /= 2.0f;
+			}
+			float ripple = (allyFactor * value) / 100.0f;
+			float rippled = pair.second->getRelationTo(other) + ripple;
+			// The original silently drops the ripple if it would cross a boundary, rather than
+			// clamping it to the boundary.
+			if (rippled > -100.0f && rippled < 100.0f)
+			{
+				pair.second->current_relations[other] = rippled;
+			}
+		}
 	}
+
+	// X-COM and the Aliens are always at war, and X-COM's relation to everyone else always
+	// mirrors what that org thinks of X-COM. This runs unconditionally, even mid-battle.
+	StateRef<Organisation> playerOrg = state.getPlayer();
+	StateRef<Organisation> alienOrg = state.getAliens();
+	if (thisOrg == playerOrg || other == playerOrg)
+	{
+		playerOrg->current_relations[alienOrg] = -100.0f;
+		alienOrg->current_relations[playerOrg] = -100.0f;
+		for (auto &pair : state.organisations)
+		{
+			StateRef<Organisation> k{&state, pair.first};
+			if (k == playerOrg)
+			{
+				continue;
+			}
+			playerOrg->current_relations[k] = pair.second->getRelationTo(playerOrg);
+		}
+	}
+}
+
+void Organisation::establishRelation(StateRef<Organisation> other, float relation)
+{
+	current_relations[other] = relation;
+	long_term_relations[other] = relation;
 }
 
 Organisation::Relation Organisation::isRelatedTo(const StateRef<Organisation> &other) const
@@ -969,8 +1009,8 @@ void Organisation::signTreatyWith(GameState &state, StateRef<Organisation> other
 	                       : (myRelation > 0) ? std::max(myRelation + 25, 100.0f)
 	                                          : 0;
 
-	current_relations[other] = newValue;
-	other->current_relations[currentOrg] = std::max(newValue, other->getRelationTo(currentOrg));
+	establishRelation(other, newValue);
+	other->establishRelation(currentOrg, std::max(newValue, other->getRelationTo(currentOrg)));
 
 	balance += bribe;
 	other->balance -= bribe;
@@ -982,7 +1022,7 @@ sp<Organisation> StateObject<Organisation>::get(const GameState &state, const US
 	auto it = state.organisations.find(id);
 	if (it == state.organisations.end())
 	{
-		LogError("No organisation matching ID \"%s\"", id);
+		LogError("No organisation matching ID \"{0}\"", id);
 		return nullptr;
 	}
 	return it->second;
@@ -1305,7 +1345,7 @@ void Organisation::RecurringMission::execute(GameState &state, StateRef<City> ci
 	buildingsRandomizer.clear();
 	for (auto &b : city->buildings)
 	{
-		if (b.second == sourceBuilding)
+		if (b.getSp() == sourceBuilding)
 		{
 			continue;
 		}
@@ -1313,14 +1353,14 @@ void Organisation::RecurringMission::execute(GameState &state, StateRef<City> ci
 		switch (pattern.target)
 		{
 			case Organisation::MissionPattern::Target::Owned:
-				if (b.second->owner == owner)
+				if (b->owner == owner)
 				{
 					break;
 				}
 				continue;
 			case Organisation::MissionPattern::Target::OwnedOrOther:
 			case Organisation::MissionPattern::Target::Other:
-				if (b.second->owner == owner)
+				if (b->owner == owner)
 				{
 					if (pattern.target == Organisation::MissionPattern::Target::OwnedOrOther)
 					{
@@ -1335,8 +1375,7 @@ void Organisation::RecurringMission::execute(GameState &state, StateRef<City> ci
 				{
 					break;
 				}
-				if (pattern.relation.find(owner->isRelatedTo(b.second->owner)) !=
-				    pattern.relation.end())
+				if (pattern.relation.find(owner->isRelatedTo(b->owner)) != pattern.relation.end())
 				{
 					break;
 				}
@@ -1346,7 +1385,7 @@ void Organisation::RecurringMission::execute(GameState &state, StateRef<City> ci
 				LogError("Impossible to arrive/depart at this point?");
 				return;
 		}
-		buildingsRandomizer.push_back(b.second);
+		buildingsRandomizer.push_back(b.getSp());
 	}
 	if (buildingsRandomizer.empty())
 	{

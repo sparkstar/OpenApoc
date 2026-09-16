@@ -1,7 +1,6 @@
 #include "game/state/battle/battlehazard.h"
 #include "framework/framework.h"
 #include "framework/logger.h"
-#include "framework/sound.h"
 #include "game/state/battle/battle.h"
 #include "game/state/battle/battleitem.h"
 #include "game/state/battle/battlemappart.h"
@@ -10,7 +9,6 @@
 #include "game/state/rules/battle/battlemapparttype.h"
 #include "game/state/rules/battle/damage.h"
 #include "game/state/rules/doodadtype.h"
-#include "game/state/shared/aequipment.h"
 #include "game/state/tilemap/tilemap.h"
 #include "game/state/tilemap/tileobject_battlehazard.h"
 #include "game/state/tilemap/tileobject_battleitem.h"
@@ -180,6 +178,10 @@ bool BattleHazard::expand(GameState &state, const TileMap &map, const Vec3<int> 
 	{
 		auto pos = pair.first + (Vec3<int>)position;
 		auto tile = map.getTile(pos);
+		if (!tile)
+		{
+			continue;
+		}
 		for (auto &obj : tile->ownedObjects)
 		{
 			if (pair.second.find(obj->getType()) != pair.second.end())

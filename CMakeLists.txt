@@ -1,9 +1,9 @@
 # check cmake version
-CMAKE_MINIMUM_REQUIRED(VERSION 3.9)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.30)
 
 # This changes the vcpkg features, so needs to be set before the first PROJECT() call
 option(BUILD_LAUNCHER "Build the launcher" ON)
-option(USE_SYSTEM_QT "Use the system-provided QT5 instead of installing the vcpkg package" OFF)
+option(USE_SYSTEM_QT "Use the system-provided QT6 instead of installing the vcpkg package" OFF)
 
 if (BUILD_LAUNCHER AND NOT USE_SYSTEM_QT)
 		list(APPEND VCPKG_MANIFEST_FEATURES "launcher")
@@ -29,8 +29,9 @@ INCLUDE(CheckCCompilerFlag)
 string(TOLOWER "${CMAKE_BUILD_TYPE}" lower_build_type)
 
 option(LTO "Build using link-time-optimisations" OFF)
-option(MSVC_PDB "Always generate PDB files" OFF)
+option(MSVC_PDB "Always generate PDB files" ON)
 option(ENABLE_TESTS "Build some unit tests" ON)
+option(USE_PCH "Enable precompiled header use during build" OFF)
 option(EXTRACT_DATA "Run the data extractor as part of the default target" ON)
 
 set(CD_PATH ${CMAKE_SOURCE_DIR}/data/cd.iso CACHE STRING "Path to cd.iso (used
@@ -42,8 +43,8 @@ endif()
 
 message("Using CD at \"${CD_PATH}\"")
 
-set(CMAKE_C_FLAGS_SANITIZE "-O1 -g -fsanitize=address")
-set(CMAKE_CXX_FLAGS_SANITIZE "-O1 -g -fsanitize=address")
+set(CMAKE_C_FLAGS_SANITIZE "-Og -g -fsanitize=address -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_SANITIZE "-Og -g -fsanitize=address -fno-omit-frame-pointer")
 
 set(CMAKE_C_FLAGS_QUICK "-O1 -g1")
 set(CMAKE_CXX_FLAGS_QUICK "-O1 -g1")
@@ -76,6 +77,8 @@ endif(LTO)
 # MSVC has default flags that CMake doesn't set
 if (MSVC)
 	add_definitions(-DUNICODE -D_UNICODE)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  /utf-8")
 	
 	if (MSVC_VERSION GREATER_EQUAL 1910)
 	    if (MSVC_VERSION EQUAL 1928)
@@ -104,6 +107,7 @@ endif()
 
 set(GLM_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/dependencies/glm)
 MARK_AS_ADVANCED(GLM_INCLUDE_DIR)
+add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
 add_subdirectory(library)
 add_subdirectory(framework)
@@ -112,6 +116,7 @@ add_subdirectory(game/state)
 add_subdirectory(game/ui)
 add_subdirectory(tools)
 add_subdirectory(dependencies)
+add_subdirectory(data/mods/crashing_vehicles)
 
 if (WIN32)
 	set(sources ${sources} "apocicon.rc")
@@ -188,7 +193,7 @@ add_dependencies(format format-sources)
 set(CLANG_FORMAT clang-format CACHE STRING "clang-format executable name in PATH")
 
 foreach(FORMAT_SOURCE ${FORMAT_SOURCES})
-	add_custom_command(TARGET format-sources COMMAND ${CLANG_FORMAT} -i ${FORMAT_SOURCE} DEPENDS ${FORMAT_SOURCE} .clang-format)
+	add_custom_command(TARGET format-sources COMMAND ${CLANG_FORMAT} -i ${FORMAT_SOURCE} POST_BUILD)
 endforeach()
 
 file(GLOB_RECURSE XML_FILES ${CMAKE_SOURCE_DIR}/data/*.xml)
@@ -270,19 +275,46 @@ add_custom_target(tidy ${CLANG_TIDY}
 
 # Localisation
 
-set(LANGUAGES en_GB fr_FR de_DE cs es it pl pt_BR ru_RU uk)
+# set(LANGUAGES en_GB fr_FR de_DE cs es it pl pt_BR ru_RU uk)
+# Add languages supported by gettext PO files - list should match the base mod - "supported_languages" in tools/extractors/main.cpp
+set(LANGUAGES "")
 
 find_package(Gettext)
 if (GETTEXT_FOUND)
 		foreach(LANG ${LANGUAGES})
 				GETTEXT_PROCESS_PO_FILES(${LANG} PO_FILES
-						${CMAKE_SOURCE_DIR}/data/languages/ufo_string_${LANG}.po)
+						${CMAKE_SOURCE_DIR}/data/languages/openapoc_${LANG}.po)
 		endforeach()
 		add_custom_target(update-translations DEPENDS pofiles)
 		foreach (LANG ${LANGUAGES})
 				add_custom_command(TARGET update-translations DEPENDS pofiles
 						COMMAND ${CMAKE_COMMAND} -E copy
-						${CMAKE_BINARY_DIR}/ufo_string_${LANG}.gmo
-						${CMAKE_SOURCE_DIR}/data/languages/${LANG}/LC_MESSAGES/ufo_string.mo)
+						${CMAKE_BINARY_DIR}/openapoc_${LANG}.gmo
+						${CMAKE_SOURCE_DIR}/data/languages/${LANG}/LC_MESSAGES/openapoc.mo)
 		endforeach()
 endif(GETTEXT_FOUND)
+
+# String extraction for translations
+find_program(XGETTEXT_EXECUTABLE xgettext)
+if(XGETTEXT_EXECUTABLE)
+	file(GLOB_RECURSE TRANSLATION_SOURCES RELATIVE ${CMAKE_SOURCE_DIR}
+		game/*.cpp
+		forms/*.cpp
+		framework/*.cpp
+		library/*.cpp)
+
+	add_custom_target(extract-translations
+		COMMAND ${XGETTEXT_EXECUTABLE}
+			--keyword=tr --keyword=tr:1
+			--from-code=UTF-8
+			--no-location
+			--add-comments=TRANSLATORS
+			--package-name=OpenApoc
+			--msgid-bugs-address=https://github.com/OpenApoc/OpenApoc/issues
+			--directory=${CMAKE_SOURCE_DIR}
+			--output=${CMAKE_SOURCE_DIR}/data/languages/openapoc.pot
+			${TRANSLATION_SOURCES}
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		COMMENT "Extracting translatable strings to openapoc.pot"
+	)
+endif()

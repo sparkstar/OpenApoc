@@ -9,7 +9,6 @@
 #include "game/state/gameevent.h"
 #include "game/state/gamestate.h"
 #include "game/state/rules/aequipmenttype.h"
-#include "game/state/rules/city/citycommonimagelist.h"
 #include "game/state/rules/city/vehicletype.h"
 #include "game/state/shared/organisation.h"
 #include "library/strings_format.h"
@@ -156,7 +155,7 @@ sp<ResearchTopic> StateObject<ResearchTopic>::get(const GameState &state, const 
 	auto it = state.research.topics.find(id);
 	if (it == state.research.topics.end())
 	{
-		LogError("No research topic matching ID \"%s\"", id);
+		LogError("No research topic matching ID \"{0}\"", id);
 		return nullptr;
 	}
 	return it->second;
@@ -182,7 +181,7 @@ const UString &StateObject<ResearchTopic>::getId(const GameState &state,
 		if (r.second == ptr)
 			return r.first;
 	}
-	LogError("No research matching pointer %p", static_cast<void *>(ptr.get()));
+	LogError("No research matching pointer {0:p}", static_cast<void *>(ptr.get()));
 	return emptyString;
 }
 
@@ -191,7 +190,7 @@ template <> sp<Lab> StateObject<Lab>::get(const GameState &state, const UString 
 	auto it = state.research.labs.find(id);
 	if (it == state.research.labs.end())
 	{
-		LogError("No lab matching ID \"%s\"", id);
+		LogError("No lab matching ID \"{0}\"", id);
 		return nullptr;
 	}
 	return it->second;
@@ -216,7 +215,7 @@ template <> const UString &StateObject<Lab>::getId(const GameState &state, const
 		if (l.second == ptr)
 			return l.first;
 	}
-	LogError("No lab matching pointer %p", static_cast<void *>(ptr.get()));
+	LogError("No lab matching pointer {0:p}", static_cast<void *>(ptr.get()));
 	return emptyString;
 }
 
@@ -244,7 +243,7 @@ Lab::~Lab()
 {
 	for (auto &agent : assigned_agents)
 	{
-		agent->assigned_to_lab = false;
+		agent->lab_assigned = nullptr;
 	}
 }
 
@@ -330,6 +329,7 @@ unsigned Lab::getQuantity() const { return manufacture_goal - manufacture_done; 
 void Lab::removeAgent(StateRef<Lab> lab, StateRef<Agent> &agent)
 {
 	lab->assigned_agents.remove(agent);
+	agent->lab_assigned = nullptr;
 }
 
 void Lab::setQuantity(StateRef<Lab> lab, unsigned quantity)

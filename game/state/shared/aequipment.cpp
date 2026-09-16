@@ -340,7 +340,7 @@ void AEquipment::loadAmmo(GameState &state, sp<AEquipment> ammoItem)
 		    std::find(type->ammo_types.begin(), type->ammo_types.end(), ammoItem->type) ==
 		        type->ammo_types.end())
 		{
-			LogError("Incorrect ammo type \"%s\" for \"%s\"", ammoItem->type->name, type->name);
+			LogError("Incorrect ammo type \"{0}\" for \"{1}\"", ammoItem->type->name, type->name);
 			return;
 		}
 	}
@@ -367,8 +367,8 @@ void AEquipment::loadAmmo(GameState &state, sp<AEquipment> ammoItem)
 	// Store the loaded ammo type for autoreload
 	lastLoadedAmmoType = ammoItem->type;
 
-	// If this has ammo then swap
-	if (payloadType)
+	// If this has ammo, swap if clip can't be refilled
+	if (payloadType && (ammoItem->ammo + ammo > payloadType->max_ammo))
 	{
 		auto ejectedType = payloadType;
 		auto ejectedAmmo = ammo;
@@ -380,7 +380,8 @@ void AEquipment::loadAmmo(GameState &state, sp<AEquipment> ammoItem)
 	else
 	{
 		payloadType = ammoItem->type;
-		ammo = ammoItem->ammo;
+		// Fill partial clip
+		ammo = ammoItem->ammo + ammo;
 		// Spend ammo
 		ammoItem->ammo = 0;
 		// Remove item from battle/agent
@@ -840,6 +841,7 @@ void AEquipment::fire(GameState &state, Vec3<float> targetPosition, StateRef<Bat
 		payloadType.clear();
 		loadAmmo(state);
 		ownerAgent->updateSpeed();
+		ownerAgent->updatePsiDefence();
 	}
 }
 

@@ -134,9 +134,9 @@ bool Strings::isFloat(const UStringView s)
 	return (endpos != u8str.c_str());
 }
 
-UString Strings::fromInteger(int i) { return format("%d", i); }
+UString Strings::fromInteger(int i) { return format("{0}", i); }
 
-UString Strings::fromFloat(float f) { return format("%f", f); }
+UString Strings::fromFloat(float f) { return format("{0}", f); }
 
 bool Strings::isWhiteSpace(char32_t c)
 {
@@ -144,6 +144,89 @@ bool Strings::isWhiteSpace(char32_t c)
 	return isspace(c) != 0;
 }
 
-UString Strings::fromU64(uint64_t i) { return format("%llu", i); }
+UString Strings::fromU64(uint64_t i) { return format("{0}", i); }
+
+UString Strings::formatTextAsCurrency(const UString &Text)
+{
+	if (Text.empty())
+	{
+		return Text;
+	}
+
+	size_t integerStart = 0;
+	if (Text[integerStart] == '-')
+	{
+		integerStart++;
+		if (integerStart == Text.length())
+		{
+			return Text;
+		}
+	}
+
+	const auto decimalPoint = Text.find('.', integerStart);
+	if (decimalPoint != UString::npos && Text.find('.', decimalPoint + 1) != UString::npos)
+	{
+		return Text;
+	}
+
+	const auto integerEnd = decimalPoint == UString::npos ? Text.length() : decimalPoint;
+	UString digits;
+	digits.reserve(integerEnd - integerStart);
+
+	for (auto i = integerStart; i < integerEnd; i++)
+	{
+		const auto ch = Text[i];
+		if (ch == ',')
+		{
+			continue;
+		}
+		if (!std::isdigit(static_cast<unsigned char>(ch)))
+		{
+			return Text;
+		}
+		digits.push_back(ch);
+	}
+
+	if (digits.empty())
+	{
+		return Text;
+	}
+
+	if (decimalPoint != UString::npos)
+	{
+		for (auto i = decimalPoint + 1; i < Text.length(); i++)
+		{
+			if (!std::isdigit(static_cast<unsigned char>(Text[i])))
+			{
+				return Text;
+			}
+		}
+	}
+
+	UString formattedText;
+	formattedText.reserve(Text.length() + digits.length() / 3);
+	if (integerStart == 1)
+	{
+		formattedText.push_back('-');
+	}
+
+	const auto firstGroupSize = digits.length() % 3 == 0 ? 3 : digits.length() % 3;
+	for (size_t i = 0; i < digits.length(); i++)
+	{
+		if (i != 0 &&
+		    (i == firstGroupSize || (i > firstGroupSize && (i - firstGroupSize) % 3 == 0)))
+		{
+			formattedText.push_back(',');
+		}
+		formattedText.push_back(digits[i]);
+	}
+
+	if (decimalPoint != UString::npos)
+	{
+		formattedText.append(Text.substr(decimalPoint));
+	}
+
+	return formattedText;
+}
 
 }; // namespace OpenApoc

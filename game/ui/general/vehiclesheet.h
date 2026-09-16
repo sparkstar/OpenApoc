@@ -1,3 +1,5 @@
+#pragma once
+
 #include "forms/form.h"
 #include "game/state/city/vehicle.h"
 #include "game/state/city/vequipment.h"
@@ -20,18 +22,24 @@ class VehicleSheet
 	void display(sp<Vehicle> vehicle);
 	void display(sp<VehicleType> vehicleType);
 	void display(sp<VEquipment> item);
-	void display(sp<VEquipmentType> itemType, bool researched = true);
+	void display(sp<VEquipmentType> itemType);
+	void display(sp<VEquipmentType> itemType, const bool isResearched);
 	void clear();
 
   private:
+	static constexpr int wrappedYSize = 30;
+	static constexpr int singleYSize = 15;
+	static constexpr int singleBaseY = 106;
+	static constexpr int wrappedBaseY = 118;
+
 	void displayImplementation(sp<Vehicle> vehicle, sp<VehicleType> vehicleType);
 
 	void displayEquipImplementation(sp<VEquipment> item, sp<VEquipmentType> itemType,
-	                                const bool isResearched = true);
+	                                const bool isResearched);
 	void displayEngine(sp<VEquipment> item, sp<VEquipmentType> type);
 	void displayWeapon(sp<VEquipment> item, sp<VEquipmentType> type);
 	void displayGeneral(sp<VEquipment> item, sp<VEquipmentType> type);
-
+	void shiftLabels(const int &baseY);
 	sp<Form> form;
 };
 

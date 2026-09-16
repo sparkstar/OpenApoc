@@ -4,7 +4,6 @@
 #include "game/state/city/research.h"
 #include "game/state/gameeventtypes.h"
 #include "game/state/gametime.h"
-#include "game/state/luagamestate.h"
 #include "game/state/rules/city/organisationraid.h"
 #include "game/state/shared/agent.h"
 #include "game/state/stateobject.h"
@@ -35,6 +34,8 @@ class UFOGrowth;
 class UFOIncursion;
 class Vehicle;
 class UfopaediaCategory;
+class UfopaediaEntry;
+class SceneryTileType;
 class BattleMap;
 class EquipmentSet;
 class Battle;
@@ -45,6 +46,7 @@ class BattleCommonSampleList;
 class BattleMapPartType;
 class EventMessage;
 class DamageType;
+class Building;
 class BuildingFunction;
 class UFOMissionPreference;
 
@@ -82,18 +84,23 @@ class GameState : public std::enable_shared_from_this<GameState>
 	StateRefMap<UFOMissionPreference> ufo_mission_preference;
 	StateRefMap<UFOIncursion> ufo_incursions;
 	StateRefMap<Base> player_bases;
+	// buildings must be declared before cities so that buildings outlive
+	// the City::buildings vector<StateRef<Building>> cached sp<> pointers
+	// during GameState destruction (members are destroyed in reverse order).
+	StateRefMap<Building> buildings;
 	StateRefMap<City> cities;
+	StateRefMap<SceneryTileType> scenery_tile_types;
 	StateRefMap<Vehicle> vehicles;
 	std::set<UString> vehiclesDeathNote;
 	StateRefMap<UfopaediaCategory> ufopaedia;
+	StateRefMap<UfopaediaEntry> ufopaedia_entries;
 	ResearchState research;
 	StateRefMap<BattleMap> battle_maps;
 	StateRefMap<HazardType> hazard_types;
 	StateRefMap<DamageModifier> damage_modifiers;
 	StateRefMap<DamageType> damage_types;
 	StateRefMap<AEquipmentType> agent_equipment;
-	StateRefMap<EquipmentSet> equipment_sets_by_score;
-	StateRefMap<EquipmentSet> equipment_sets_by_level;
+	StateRefMap<EquipmentSet> equipment_sets;
 	StateRefMap<BuildingFunction> building_functions;
 	sp<Battle> current_battle;
 	sp<CityCommonImageList> city_common_image_list;
@@ -151,12 +158,13 @@ class GameState : public std::enable_shared_from_this<GameState>
 
 	GameScore totalScore = {};
 	GameScore weekScore = {};
+	int previousWeekIncome = 0;
 	int micronoidRainChance = 0;
 
 	// Used to move events from battle to city and remember time
 
 	GameTime gameTimeBeforeBattle = GameTime(0);
-	UString missionLocationBattle;
+	StateRef<Building> missionLocationBattleBuilding;
 	UString eventFromBattleText;
 	GameEventType eventFromBattle = GameEventType::None;
 
@@ -171,6 +179,7 @@ class GameState : public std::enable_shared_from_this<GameState>
 	Xorshift128Plus<uint32_t> rng;
 
 	UString getPlayerBalance() const;
+	UString formatCurrency(int64_t amount) const;
 	StateRef<Organisation> getOrganisation(const UString &orgID);
 	const StateRef<Organisation> &getPlayer() const;
 	StateRef<Organisation> getPlayer();
@@ -189,9 +198,9 @@ class GameState : public std::enable_shared_from_this<GameState>
 
 	// high level api for saving game
 	// WARNING! Does not save metadata
-	bool saveGame(const UString &path, bool pack = true, bool pretty = false);
+	bool saveGame(const UString &path, bool pack = true, bool pretty = true);
 	bool saveGameDelta(const UString &path, const GameState &reference, bool pack = true,
-	                   bool pretty = false);
+	                   bool pretty = true);
 
 	// serializes gamestate to archive
 	bool serialize(SerializationArchive *archive) const;
@@ -252,9 +261,10 @@ class GameState : public std::enable_shared_from_this<GameState>
 	void updateEndOfFiveMinutes();
 	void updateEndOfHour();
 	void updateEndOfDay();
-	void updateEndOfWeek();
-
-	void updateHumanEconomy();
+	void updateEndOfWeek(bool gameStart);
+	void updateUfoGrowth();
+	void updateItemMarket();
+	void updateOrgFinances();
 	void weeklyPlayerUpdate();
 	int calculateFundingModifier() const;
 
@@ -263,8 +273,6 @@ class GameState : public std::enable_shared_from_this<GameState>
 	// Following members are not serialized
 	bool newGame = false;
 	bool skipTurboCalculations = false;
-
-	LuaGameState luaGameState;
 
 	// Loads all mods set in the options - note this likely requires the mod data directories to
 	// already be added to the filesystem

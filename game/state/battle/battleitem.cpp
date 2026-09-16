@@ -7,7 +7,6 @@
 #include "game/state/battle/battleunit.h"
 #include "game/state/gamestate.h"
 #include "game/state/rules/aequipmenttype.h"
-#include "game/state/rules/battle/battlecommonsamplelist.h"
 #include "game/state/rules/battle/damage.h"
 #include "game/state/shared/aequipment.h"
 #include "game/state/tilemap/collision.h"
@@ -22,14 +21,15 @@
 namespace OpenApoc
 {
 
-void BattleItem::die(GameState &state, bool violently)
+void BattleItem::die(GameState &state, bool violently, bool scoreAsLost)
 {
 	if (violently)
 	{
 		item->explode(state);
 	}
 	// Lose score if item that dies and it's not a primed grenade
-	if (!item->primed && item->ownerOrganisation && item->ownerOrganisation == state.getPlayer())
+	if (scoreAsLost && !item->primed && item->ownerOrganisation &&
+	    item->ownerOrganisation == state.getPlayer())
 	{
 		state.current_battle->score.equipmentLost -= item->type->score;
 		if (item->payloadType)
@@ -242,12 +242,12 @@ void BattleItem::update(GameState &state, unsigned int ticks)
 			// Intentional fall-through
 			case TileObject::Type::Ground:
 				// Let item fall so that it can collide with scenery or ground if falling on top of
-				// it
+				// it, but never past the surface we just hit
 				newPosition = {previousPosition.x, previousPosition.y,
-				               std::min(newPosition.z, previousPosition.z)};
+				               std::max(std::min(newPosition.z, previousPosition.z), c.position.z)};
 				break;
 			default:
-				LogError("What the hell is this item colliding with? Type is %d",
+				LogError("What the hell is this item colliding with? Type is {0}",
 				         (int)c.obj->getType());
 				break;
 		}
@@ -266,21 +266,28 @@ void BattleItem::update(GameState &state, unsigned int ticks)
 			velocity = {0.0f, 0.0f, 0.0f};
 		}
 		// Collision with map edge
-		if (newPosition.x < 0 || newPosition.y < 0 || newPosition.y >= mapSize.y ||
-		    newPosition.x >= mapSize.x || newPosition.y >= mapSize.y)
+		if (newPosition.x < 0 || newPosition.x >= mapSize.x || newPosition.y < 0 ||
+		    newPosition.y >= mapSize.y)
 		{
 			collision = true;
 			velocity.x = -velocity.x / 4;
 			velocity.y = -velocity.y / 4;
 			velocity.z = 0;
-			newPosition = previousPosition;
+			newPosition.x = glm::clamp(newPosition.x, 0.0f, mapSize.x - 0.01f);
+			newPosition.y = glm::clamp(newPosition.y, 0.0f, mapSize.y - 0.01f);
+			newPosition.z = glm::clamp(newPosition.z, 0.0f, mapSize.z - 0.01f);
 		}
 		// Fell below 0???
 		if (newPosition.z < 0)
 		{
-			LogError("Item at %f %f fell off the end of the world!?", newPosition.x, newPosition.y);
-			die(state, false);
-			return;
+			if (!tileObject->map.getTile(newPosition))
+			{
+				LogError("Item at {0} {1} fell off the end of the world!?", newPosition.x,
+				         newPosition.y);
+				die(state, false);
+				return;
+			}
+			collision = true;
 		}
 		setPosition(newPosition);
 	}

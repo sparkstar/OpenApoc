@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <iterator>
-#include <list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -55,6 +53,8 @@ class Strings
 	[[nodiscard]] static UString fromU64(uint64_t i);
 	[[nodiscard]] static UString fromFloat(float f);
 	[[nodiscard]] static bool isWhiteSpace(char32_t c);
+
+	static UString formatTextAsCurrency(const UString &Text);
 };
 
 }; // namespace OpenApoc

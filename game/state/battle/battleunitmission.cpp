@@ -3,7 +3,6 @@
 #include "framework/sound.h"
 #include "game/state/battle/battleitem.h"
 #include "game/state/battle/battleunit.h"
-#include "game/state/gameevent.h"
 #include "game/state/gamestate.h"
 #include "game/state/rules/aequipmenttype.h"
 #include "game/state/rules/battle/battlecommonsamplelist.h"
@@ -150,17 +149,17 @@ bool BattleUnitTileHelper::canEnterTile(Tile *from, Tile *to, bool allowJumping,
 	Vec3<int> fromPos = from->position;
 	if (fromPos == toPos)
 	{
-		LogError("FromPos == ToPos %s", toPos);
+		LogError("FromPos == ToPos {0}", toPos);
 		return false;
 	}
 	if (!map.tileIsValid(fromPos))
 	{
-		LogError("FromPos %s is not on the map", fromPos);
+		LogError("FromPos {0} is not on the map", fromPos);
 		return false;
 	}
 	if (!map.tileIsValid(toPos))
 	{
-		LogError("ToPos %s is not on the map", toPos);
+		LogError("ToPos {0} is not on the map", toPos);
 		return false;
 	}
 
@@ -224,7 +223,8 @@ bool BattleUnitTileHelper::canEnterTile(Tile *from, Tile *to, bool allowJumping,
 	if (large)
 	{
 		// Can we fit?
-		if (toPos.x < 1 || toPos.y < 1 || toPos.z + 1 >= map.size.z)
+		if (toPos.x < 1 || toPos.y < 1 || toPos.z + 1 >= map.size.z || fromPos.x < 1 ||
+		    fromPos.y < 1)
 		{
 			return false;
 		}
@@ -1030,7 +1030,7 @@ bool BattleUnitTileHelper::canEnterTile(Tile *from, Tile *to, bool allowJumping,
 	// If jumping then cost is preset (2x normal movement cost)
 	if (!allowJumping && jumped)
 	{
-		cost = 2.0f * (float)STANDART_MOVE_TU_COST *
+		cost = 2.0f * (float)STANDARD_MOVE_TU_COST *
 		       ((toPos.x != fromPos.x && toPos.y != fromPos.y) ? 3.0f : 2.0f);
 	}
 	else
@@ -1153,17 +1153,62 @@ int BattleUnitMission::getFacingDelta(Vec2<int> curFacing, Vec2<int> tarFacing)
 	return result;
 }
 
-Vec2<int> BattleUnitMission::getFacing(BattleUnit &u, Vec3<int> to, int facingDelta)
+// Data-only: compute facing from direction vector
+Vec2<int> BattleUnitMission::getFacing(Vec3<float> from, Vec3<float> to,
+                                       const std::set<Vec2<int>> *allowedFacings,
+                                       Vec2<int> fallbackFacing, int facingDelta)
 {
-	return getFacing(u, (Vec3<int>)u.position, to, facingDelta);
+	auto isFacingAllowed = [allowedFacings](Vec2<int> f)
+	{ return !allowedFacings || allowedFacings->empty() || allowedFacings->count(f) > 0; };
+
+	float closestAngle = FLT_MAX;
+	Vec3<int> closestVector = {0, 0, 0};
+	Vec3<float> targetFacing = (Vec3<float>)(to - from);
+	if (targetFacing.x == 0.0f && targetFacing.y == 0.0f)
+	{
+		closestVector = {fallbackFacing.x, fallbackFacing.y, 0};
+	}
+	else
+	{
+		targetFacing.z = 0;
+		for (auto &a : angles)
+		{
+			float angle = glm::angle(glm::normalize(targetFacing), glm::normalize(a));
+			if (angle < closestAngle && isFacingAllowed(Vec2<int>{a.x, a.y}))
+			{
+				closestAngle = angle;
+				closestVector = a;
+			}
+		}
+	}
+	if (facingDelta == 0)
+	{
+		return {closestVector.x, closestVector.y};
+	}
+	else
+	{
+		Vec2<int> targetFacing = {closestVector.x, closestVector.y};
+		int tarFacing = facing_dir_map.at(targetFacing) + facingDelta;
+		if (tarFacing > 7)
+			tarFacing -= 8;
+		if (tarFacing < 0)
+			tarFacing += 8;
+		return dir_facing_map.at(tarFacing);
+	}
 }
 
-Vec2<int> BattleUnitMission::getFacingStep(BattleUnit &u, Vec2<int> targetFacing, int facingDelta)
+// Data-only: compute next facing step when turning
+Vec2<int> BattleUnitMission::getFacingStep(Vec2<int> currentFacing, Vec2<int> targetFacing,
+                                           const std::set<Vec2<int>> *allowedFacings,
+                                           int facingDelta)
 {
-	Vec2<int> dest = u.facing;
+	auto isFacingAllowed = [allowedFacings](Vec2<int> f)
+	{ return !allowedFacings || allowedFacings->empty() || allowedFacings->count(f) > 0; };
+
+	Vec2<int> dest = currentFacing;
 
 	// Turn
-	int curFacing = facing_dir_map.at(u.facing);
+	int curFacing = facing_dir_map.at(currentFacing);
 	int tarFacing = facing_dir_map.at(targetFacing) + facingDelta;
 	if (tarFacing > 7)
 		tarFacing -= 8;
@@ -1192,47 +1237,28 @@ Vec2<int> BattleUnitMission::getFacingStep(BattleUnit &u, Vec2<int> targetFacing
 		}
 		dest = dir_facing_map.at(curFacing);
 
-	} while (!u.agent->isFacingAllowed(dest));
+	} while (!isFacingAllowed(dest));
 	return dest;
 }
 
+// Convenience: delegates to data-only version
+Vec2<int> BattleUnitMission::getFacing(BattleUnit &u, Vec3<int> to, int facingDelta)
+{
+	return getFacing((Vec3<float>)(Vec3<int>)u.position, (Vec3<float>)to,
+	                 u.agent->getAllowedFacings(), u.goalFacing, facingDelta);
+}
+
+// Convenience: delegates to data-only version
+Vec2<int> BattleUnitMission::getFacingStep(BattleUnit &u, Vec2<int> targetFacing, int facingDelta)
+{
+	return getFacingStep(u.facing, targetFacing, u.agent->getAllowedFacings(), facingDelta);
+}
+
+// Convenience: delegates to data-only version
 Vec2<int> BattleUnitMission::getFacing(BattleUnit &u, Vec3<float> from, Vec3<float> to,
                                        int facingDelta)
 {
-	float closestAngle = FLT_MAX;
-	Vec3<int> closestVector = {0, 0, 0};
-	Vec3<float> targetFacing = (Vec3<float>)(to - from);
-	if (targetFacing.x == 0.0f && targetFacing.y == 0.0f)
-	{
-		closestVector = {u.goalFacing.x, u.goalFacing.y, 0};
-	}
-	else
-	{
-		targetFacing.z = 0;
-		for (auto &a : angles)
-		{
-			float angle = glm::angle(glm::normalize(targetFacing), glm::normalize(a));
-			if (angle < closestAngle && u.agent->isFacingAllowed(Vec2<int>{a.x, a.y}))
-			{
-				closestAngle = angle;
-				closestVector = a;
-			}
-		}
-	}
-	if (facingDelta == 0)
-	{
-		return {closestVector.x, closestVector.y};
-	}
-	else
-	{
-		Vec2<int> targetFacing = {closestVector.x, closestVector.y};
-		int tarFacing = facing_dir_map.at(targetFacing) + facingDelta;
-		if (tarFacing > 7)
-			tarFacing -= 8;
-		if (tarFacing < 0)
-			tarFacing += 8;
-		return dir_facing_map.at(tarFacing);
-	}
+	return getFacing(from, to, u.agent->getAllowedFacings(), u.goalFacing, facingDelta);
 }
 
 BattleUnitMission *BattleUnitMission::turn(BattleUnit &u, Vec2<int> target, bool free,
@@ -1470,7 +1496,7 @@ bool BattleUnitMission::getNextBodyState(GameState &state, BattleUnit &u, BodySt
 				}
 				else
 				{
-					LogError("Unit %s (%s) (%s) lost capability to attain bodyState %d?", u.id,
+					LogError("Unit {0} ({1}) ({2}) lost capability to attain bodyState {3}?", u.id,
 					         u.agent->name, u.agent->type->id, (int)targetBodyState);
 				}
 			}
@@ -1537,7 +1563,7 @@ MovementState BattleUnitMission::getNextMovementState(GameState &, BattleUnit &u
 						break;
 					}
 				default:
-					LogError("Invalid facingDelta %d", facingDelta);
+					LogError("Invalid facingDelta {0}", facingDelta);
 					break;
 			}
 			break;
@@ -1552,19 +1578,25 @@ void BattleUnitMission::update(GameState &state, BattleUnit &u, unsigned int tic
 	switch (this->type)
 	{
 		case Type::Jump:
-			if (!jumped && !u.falling && u.atGoal && u.facing == u.goalFacing &&
+			if (!cancelled && !jumped && !u.falling && u.atGoal && u.facing == u.goalFacing &&
 			    u.facing == targetFacing &&
 			    (u.current_body_state == u.target_body_state ||
 			     targetBodyState == BodyState::Jumping) &&
 			    u.target_body_state == targetBodyState)
 			{
-				// Jumping cost assumed same as walking into tile
-				int cost = STANDART_MOVE_TU_COST;
-				if (!spendAgentTUs(state, u, cost, true))
+				if (targetBodyState == BodyState::Jumping)
 				{
-					return;
+					// Jumping cost assumed same as walking into tile
+					if (!spendAgentTUs(state, u, STANDARD_MOVE_TU_COST, true))
+					{
+						return;
+					}
+					u.launch(state, jumpTarget, targetBodyState);
 				}
-				u.launch(state, jumpTarget, targetBodyState);
+				else
+				{
+					u.jumpDown(state, jumpTarget, targetBodyState);
+				}
 				jumped = true;
 			}
 			return;
@@ -1763,7 +1795,7 @@ bool BattleUnitMission::isFinishedInternal(GameState &, BattleUnit &u)
 
 void BattleUnitMission::start(GameState &state, BattleUnit &u)
 {
-	LogWarning("Unit %s mission \"%s\" starting", u.id, getName());
+	LogWarning("Unit {0} mission \"{1}\" starting", u.id, getName());
 
 	switch (this->type)
 	{
@@ -1789,7 +1821,7 @@ void BattleUnitMission::start(GameState &state, BattleUnit &u)
 				}
 				if (item->type->type != AEquipmentType::Type::Teleporter)
 				{
-					LogError("Unit is trying to teleport using non-teleporter item %s!?",
+					LogError("Unit is trying to teleport using non-teleporter item {0}!?",
 					         item->type->name);
 					cancelled = true;
 					return;
@@ -1837,6 +1869,8 @@ void BattleUnitMission::start(GameState &state, BattleUnit &u)
 			if (targetUnit->brainSucker && targetUnit->brainSucker.id != u.id)
 			{
 				cancelled = true;
+				u.resetGoal();
+				u.startFalling(state);
 				return;
 			}
 			targetUnit->brainSucker = {&state, u.id};
@@ -1948,7 +1982,14 @@ void BattleUnitMission::start(GameState &state, BattleUnit &u)
 			{
 				u.setFacing(state, u.goalFacing);
 			}
-			cancelled = u.isLarge() || !u.canLaunch(jumpTarget);
+			if (targetBodyState == BodyState::Jumping)
+			{
+				cancelled = u.isLarge() || !u.canLaunch(jumpTarget);
+			}
+			else
+			{
+				cancelled = !u.canJumpDown((Vec3<int>)jumpTarget, jumpTarget);
+			}
 			return;
 		case Type::ChangeBodyState:
 		case Type::AcquireTU:
@@ -1975,8 +2016,8 @@ void BattleUnitMission::setPathTo(GameState &state, BattleUnit &u, Vec3<int> tar
 			// If unit cannot move at all - cancel
 			if (!u.canMove())
 			{
-				LogInfo("Cannot move to %d %d %d, unit has no movement ability", target.x, target.y,
-				        target.z);
+				LogInfo("Cannot move to {0} {1} {2}, unit has no movement ability", target.x,
+				        target.y, target.z);
 				cancelled = true;
 				return;
 			}
@@ -2006,7 +2047,7 @@ void BattleUnitMission::setPathTo(GameState &state, BattleUnit &u, Vec3<int> tar
 							    !targetTile->getUnitIfPresent(true, true, false, u.tileObject,
 							                                  false, u.isLarge()))
 							{
-								LogInfo("Cannot move to %d %d %d, found an adjacent free tile, "
+								LogInfo("Cannot move to {0} {1} {2}, found an adjacent free tile, "
 								        "moving to an adjacent tile",
 								        target.x, target.y, target.z);
 								approachOnly = true;
@@ -2025,7 +2066,7 @@ void BattleUnitMission::setPathTo(GameState &state, BattleUnit &u, Vec3<int> tar
 				}
 				if (!approachOnly)
 				{
-					LogInfo("Cannot move to %d %d %d, impassable", target.x, target.y, target.z);
+					LogInfo("Cannot move to {0} {1} {2}, impassable", target.x, target.y, target.z);
 					cancelled = true;
 					return;
 				}
@@ -2040,7 +2081,7 @@ void BattleUnitMission::setPathTo(GameState &state, BattleUnit &u, Vec3<int> tar
 				target.z--;
 				if (target.z == -1)
 				{
-					LogError("Solid ground missing on level 0? Reached %d %d %d", target.x,
+					LogError("Solid ground missing on level 0? Reached {0} {1} {2}", target.x,
 					         target.y, target.z);
 					cancelled = true;
 					return;
@@ -2054,12 +2095,12 @@ void BattleUnitMission::setPathTo(GameState &state, BattleUnit &u, Vec3<int> tar
 
 		auto path = state.current_battle->findShortestPath(
 		    u.goalPosition, target, BattleUnitTileHelper{map, u}, approachOnly, demandGiveWay,
-		    !blockedByMovingUnit);
+		    !blockedByMovingUnit, TileMap::MAX_ITERATION_LIMIT_DIRECT_FOR_BATTLE);
 
 		// Cancel movement if the closest path ends at the current position
 		if (path.size() == 1 && path.back() == Vec3<int>{u.position})
 		{
-			LogInfo("Cannot move to %s, closest path ends at origin", Vec3<int>{u.goalPosition});
+			LogInfo("Cannot move to {0}, closest path ends at origin", Vec3<int>{u.goalPosition});
 			cancelled = true;
 			return;
 		}
@@ -2074,7 +2115,7 @@ void BattleUnitMission::setPathTo(GameState &state, BattleUnit &u, Vec3<int> tar
 	}
 	else
 	{
-		LogError("Mission %s: Unit without tileobject attempted pathfinding!", getName());
+		LogError("Mission {0}: Unit without tileobject attempted pathfinding!", getName());
 		cancelled = true;
 		return;
 	}
@@ -2520,38 +2561,38 @@ UString BattleUnitMission::getName()
 			name = "AcquireTUs";
 			break;
 		case Type::GotoLocation:
-			name = "GotoLocation " + format(" %s", targetLocation);
+			name = "GotoLocation " + format(" {0}", targetLocation);
 			break;
 		case Type::Teleport:
-			name = "Teleport to " + format(" %s", targetLocation);
+			name = "Teleport to " + format(" {0}", targetLocation);
 			break;
 		case Type::RestartNextMission:
 			name = "Restart next mission";
 			break;
 		case Type::Snooze:
-			name = "Snooze " + format(" for %u ticks", timeToSnooze);
+			name = "Snooze " + format(" for {0} ticks", timeToSnooze);
 			break;
 		case Type::ChangeBodyState:
-			name = "ChangeBodyState " + format("%d", (int)this->targetBodyState);
+			name = "ChangeBodyState " + format("{0}", (int)this->targetBodyState);
 			break;
 		case Type::ThrowItem:
 			name = "ThrowItem " +
-			       format("%s at %s", item ? item->type->name : "(item is gone)", targetLocation);
+			       format("{0} at {1}", item ? item->type->name : "(item is gone)", targetLocation);
 			break;
 		case Type::DropItem:
-			name = "DropItem " + format("%s", item ? item->type->name : "(item is gone)");
+			name = "DropItem " + format("{0}", item ? item->type->name : "(item is gone)");
 			break;
 		case Type::ReachGoal:
 			name = "ReachGoal";
 			break;
 		case Type::Turn:
-			name = "Turn " + format(" %s", targetFacing);
+			name = "Turn " + format(" {0}", targetFacing);
 			break;
 		case Type::Brainsuck:
-			name = "Brainsuck " + format(" %s", targetUnit.id);
+			name = "Brainsuck " + format(" {0}", targetUnit.id);
 			break;
 		case Type::Jump:
-			name = "Jump to " + format(" %s", jumpTarget);
+			name = "Jump to " + format(" {0}", jumpTarget);
 			break;
 	}
 	return name;
